@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Home,
@@ -13,11 +14,12 @@ import {
   Settings,
   CreditCard,
   LogOut,
-  ShipWheel,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store";
+import { logout as logoutAPI } from "@/lib/api/auth";
 import { LoginModal } from "@/components/auth/login-modal";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 
 const mainNavItems = [
@@ -37,17 +39,36 @@ const accountNavItems = [
 
 export function DesktopSidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user, isLoading, logout } = useAuthStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isAuthenticated = !!user;
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logoutAPI();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      logout();
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen bg-zinc-950 border-r border-white/10 fixed left-0 top-0 z-50">
       {/* Logo */}
       <div className="p-6 ">
         <Link href="/" className="flex items-center gap-2">
-          <ShipWheel className="text-brand size-5" />
-          <h1 className="text-2xl font-bold text-brand">Balani</h1>
+          <Image
+            src="/icons/icon-192x192.png"
+            alt="Nauhub Logo"
+            width={32}
+            height={32}
+            priority
+          />
+          <h1 className="text-2xl font-bold text-brand">Nauhub</h1>
         </Link>
       </div>
 
@@ -116,25 +137,35 @@ export function DesktopSidebar() {
 
       {/* User Section */}
       <div className="p-4 border-t border-white/10">
-        {isAuthenticated ? (
+        {isLoading ? (
+          <div className="space-y-3 px-2 h-20">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-10 rounded-full" />
+              <div className="flex flex-col space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-3 w-full" />
+          </div>
+        ) : isAuthenticated && user ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3 px-2">
               <div className="size-10 rounded-full bg-brand/20 flex items-center justify-center">
                 <User className="size-5 text-brand" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user?.mobile || "User"}
-                </p>
+                <p className="text-sm font-medium truncate">{user?.name}</p>
                 <p className="text-xs text-muted-foreground">Free Plan</p>
               </div>
             </div>
             <button
-              onClick={() => logout()}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <LogOut className="size-4" />
-              Sign Out
+              {isLoggingOut ? "Signing Out..." : "Sign Out"}
             </button>
           </div>
         ) : (

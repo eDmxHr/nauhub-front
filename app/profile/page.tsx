@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
+import { logout as logoutAPI } from "@/lib/api/auth";
 import { LoginModal } from "@/components/auth/login-modal";
 import { ProfileManagement } from "@/components/auth/profile-management";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showProfileManagement, setShowProfileManagement] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, logout, activeProfile, setShowProfileSelector } =
     useAuthStore();
   const isAuthenticated = !!user;
@@ -108,9 +110,17 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.refresh();
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logoutAPI();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      logout();
+      setIsLoggingOut(false);
+      router.refresh();
+    }
   };
 
   return (
@@ -136,7 +146,7 @@ export default function ProfilePage() {
                 <h1 className="text-xl font-bold">
                   {activeProfile?.name || user.name || "User"}
                 </h1>
-                <p className="text-sm text-muted-foreground">{user.mobile}</p>
+                <p className="text-sm text-muted-foreground">{user.phone}</p>
                 {activeProfile && (
                   <button
                     onClick={() => setShowProfileSelector(true)}
@@ -284,17 +294,20 @@ export default function ProfilePage() {
         <div className="px-4 pb-8">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 p-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-colors"
+            disabled={isLoggingOut}
+            className="w-full flex items-center justify-center gap-2 p-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogOut className="size-5" />
-            <span className="font-medium">Sign Out</span>
+            <span className="font-medium">
+              {isLoggingOut ? "Signing Out..." : "Sign Out"}
+            </span>
           </button>
         </div>
       )}
 
       {/* App Version */}
       <div className="text-center pb-8">
-        <p className="text-xs text-muted-foreground">Balani v1.0.0</p>
+        <p className="text-xs text-muted-foreground">Nauhub v1.0.0</p>
       </div>
 
       {/* Login Modal */}

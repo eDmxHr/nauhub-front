@@ -1,12 +1,12 @@
-import axios from 'axios';
-import Cookies from 'js-cookie';
+import axios from "axios";
+import Cookies from "js-cookie";
 
 // Create axios instance with base configuration
 export const apiClient = axios.create({
-  baseURL: 'https://api.nauhub.app/api/app',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
   timeout: 30000, // 30 seconds
 });
@@ -15,7 +15,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // Get token from cookie
-    const token = Cookies.get('auth_token');
+    const token = Cookies.get("auth_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -35,22 +35,22 @@ apiClient.interceptors.response.use(
       switch (error.response.status) {
         case 401:
           // Unauthorized - clear auth cookie
-          Cookies.remove('auth_token', { path: '/' });
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+          Cookies.remove("auth_token", { path: "/" });
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
           }
           break;
         case 422:
           // Validation error - return the error message
           break;
         default:
-          console.error('API Error:', error.response.data);
+          console.error("API Error:", error.response.data);
       }
     } else if (error.request) {
       // Network error
-      console.error('Network Error:', error.message);
+      console.error("Network Error:", error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );

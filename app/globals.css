@@ -41,7 +41,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   /* Brand colors */
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
@@ -81,9 +81,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  
-  /* Brand color - Balani Purple */
-  --brand: oklch(66.6% 0.179 58.318);
+
+  /* Brand color - Nauhub Purple */
+  --brand: oklch(0.5492 0.2045 35.23);
   --brand-foreground: oklch(0.985 0 0);
   --brand-muted: oklch(0.627 0.265 303.9 / 20%);
 }
@@ -123,7 +123,7 @@
   .bottom-safe {
     bottom: env(safe-area-inset-bottom, 0px);
   }
-  
+
   /* Combined padding for header offset + safe area */
   .pt-header-safe {
     padding-top: calc(4rem + env(safe-area-inset-top, 0px));

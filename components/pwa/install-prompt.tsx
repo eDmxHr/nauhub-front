@@ -105,7 +105,7 @@ export function InstallPrompt() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white mb-1">Install Balani</h3>
+            <h3 className="font-semibold text-white mb-1">Install Nauhub</h3>
 
             {isIOS ? (
               <div className="flex items-center gap-2 text-sm text-zinc-300">

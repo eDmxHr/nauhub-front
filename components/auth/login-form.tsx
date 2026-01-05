@@ -8,7 +8,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useAuthStore } from "@/lib/store";
-import { requestOTP, login as loginAPI } from "@/lib/api/auth";
+import { sendOTP, login as loginAPI, getCurrentUser } from "@/lib/api/auth";
 import { AxiosError } from "axios";
 
 interface LoginFormProps {
@@ -21,6 +21,7 @@ type Step = "phone" | "otp";
 export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
   const [isRequestingOTP, setIsRequestingOTP] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -29,6 +30,10 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
   const login = useAuthStore((state) => state.login);
 
   const handleSendOTP = async () => {
+    if (!name.trim()) {
+      setError("Please enter your name");
+      return;
+    }
     if (phone.length < 7) {
       setError("Please enter a valid phone number");
       return;
@@ -38,7 +43,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
     setError("");
 
     try {
-      await requestOTP(phone);
+      await sendOTP(phone);
       setStep("otp");
       setError("");
     } catch (err) {
@@ -62,15 +67,47 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
     setError("");
 
     try {
-      const response = await loginAPI(phone, otp);
+      const response = await loginAPI(phone, otp, name);
 
-      // Store user info with token
+      // First, store the token in auth store and cookies
+      // This is needed for the axios interceptor to include it in subsequent requests
       login({
-        id: crypto.randomUUID(),
-        mobile: phone,
-        token: response.data,
+        id: "", // Will be updated after fetching user data
+        phone: phone,
+        name: name,
+        token: response.token,
+        avatar: "",
         createdAt: new Date(),
       });
+
+      // Small delay to ensure cookie is set before making the next request
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Now fetch user data with the stored token
+      const userData = await getCurrentUser();
+
+      // Map profiles correctly: avatar_url -> avatar
+      const mappedProfiles =
+        userData.profiles?.map((p) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar_url, // Map avatar_url to avatar
+          isKids: p.isKids,
+          pin: p.pin,
+          createdAt: new Date(p.createdAt),
+        })) || [];
+
+      // Update the user with complete data and profiles
+      const userToStore = {
+        id: userData.id,
+        phone: userData.phone,
+        name: userData.name || name,
+        token: response.token,
+        avatar: userData.avatar,
+        createdAt: new Date(userData.createdAt),
+        profiles: mappedProfiles,
+      };
+      login(userToStore);
 
       // Call success callback
       onSuccess?.();
@@ -101,7 +138,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
   };
 
   return (
-    <div className="w-full h-[380px] flex flex-col">
+    <div className="w-full h-[450px] flex flex-col">
       {/* Step 1: Phone Number */}
       {step === "phone" && (
         <div className="flex flex-col h-full">
@@ -115,6 +152,22 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
 
           {/* Form */}
           <div className="space-y-4 flex-1 flex flex-col">
+            <div>
+              <label
+                className="text-sm font-medium text-muted-foreground mb-2 block"
+                id="name"
+              >
+                Name
+              </label>
+              <input
+                name="name"
+                placeholder="Enter your name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-white/10 rounded-xl py-3 px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
             {/* Phone Input */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -126,6 +179,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
                   <span className="text-sm">+960</span>
                 </div>
                 <input
+                  name="phone"
                   type="tel"
                   placeholder="9XX XXX"
                   value={phone}
@@ -147,7 +201,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
             {/* Send OTP Button */}
             <button
               onClick={handleSendOTP}
-              disabled={isRequestingOTP || phone.length < 7}
+              disabled={isRequestingOTP || phone.length < 7 || !name.trim()}
               className="w-full py-3 bg-brand hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
             >
               {isRequestingOTP ? (
@@ -246,9 +300,6 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
                 </InputOTP>
               </div>
             </div>
-
-            {/* Spacer */}
-            <div className="flex-1" />
 
             {/* Verify Button */}
             <button

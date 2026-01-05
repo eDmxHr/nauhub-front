@@ -4,7 +4,7 @@ import { generatePageMetadata } from "@/lib/seo";
 export const metadata: Metadata = generatePageMetadata({
   title: "Profile",
   description:
-    "Manage your Balani account settings, preferences, and subscription.",
+    "Manage your Nauhub account settings, preferences, and subscription.",
   path: "/profile",
   noIndex: true, // Don't index user-specific pages
   keywords: ["profile", "account", "settings"],

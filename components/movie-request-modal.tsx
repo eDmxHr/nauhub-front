@@ -74,7 +74,7 @@ export function MovieRequestModal({
               </div>
 
               <p className="text-sm text-muted-foreground">
-                This content is not yet available on Balani. Submit a request
+                This content is not yet available on Nauhub. Submit a request
                 and we&apos;ll try to add it to our library.
               </p>
 

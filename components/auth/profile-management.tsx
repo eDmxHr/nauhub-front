@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useAuthStore } from "@/lib/store";
 import { Profile } from "@/lib/types";
@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  createProfile,
+  updateProfile as updateProfileAPI,
+  deleteProfile as deleteProfileAPI,
+} from "@/lib/api/profiles";
+import {
   ResponsiveModal,
   ResponsiveModalContent,
   ResponsiveModalHeader,
@@ -28,33 +33,23 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-
-const DEFAULT_AVATAR_COLORS = [
-  "bg-red-500",
-  "bg-blue-500",
-  "bg-green-500",
-  "bg-yellow-500",
-  "bg-purple-500",
-  "bg-pink-500",
-];
-
-const AVATAR_OPTIONS = [
-  { id: "red", color: "bg-red-500" },
-  { id: "blue", color: "bg-blue-500" },
-  { id: "green", color: "bg-green-500" },
-  { id: "yellow", color: "bg-yellow-500" },
-  { id: "purple", color: "bg-purple-500" },
-  { id: "pink", color: "bg-pink-500" },
-  { id: "orange", color: "bg-orange-500" },
-  { id: "teal", color: "bg-teal-500" },
-];
+import {
+  AVATAR_OPTIONS,
+  getAvatarColor,
+  isColorAvatar,
+} from "@/lib/constants/avatar";
 
 interface ProfileManagementProps {
   isOpen: boolean;
   onClose: () => void;
+  initialCreateMode?: boolean;
 }
 
-export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
+export function ProfileManagement({
+  isOpen,
+  onClose,
+  initialCreateMode = false,
+}: ProfileManagementProps) {
   const { user, addProfile, updateProfile, deleteProfile } = useAuthStore();
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -67,18 +62,37 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
   const [name, setName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("red");
   const [isKids, setIsKids] = useState(false);
-  const [hasPasscode, setHasPasscode] = useState(false);
-  const [passcode, setPasscode] = useState("");
+  const [hasPin, setHasPin] = useState(false);
+  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
 
   const profiles = user?.profiles || [];
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialCreateMode) {
+        setIsCreating(true);
+        // Reset form for new profile
+        setName("");
+        setSelectedAvatar("red");
+        setIsKids(false);
+        setHasPin(false);
+        setPin("");
+        setError("");
+        setEditingProfile(null);
+      }
+    } else {
+      // Reset everything when modal closes
+      resetForm();
+    }
+  }, [isOpen, initialCreateMode]);
 
   const resetForm = () => {
     setName("");
     setSelectedAvatar("red");
     setIsKids(false);
-    setHasPasscode(false);
-    setPasscode("");
+    setHasPin(false);
+    setPin("");
     setError("");
     setEditingProfile(null);
     setIsCreating(false);
@@ -93,8 +107,8 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
     setName(profile.name);
     setSelectedAvatar(profile.avatar || "red");
     setIsKids(profile.isKids);
-    setHasPasscode(!!profile.passcode);
-    setPasscode(profile.passcode || "");
+    setHasPin(!!profile.pin);
+    setPin(profile.pin || "");
     setEditingProfile(profile);
     setIsCreating(false);
   };
@@ -105,7 +119,7 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
       return;
     }
 
-    if (hasPasscode && passcode.length !== 4) {
+    if (hasPin && pin.length !== 4) {
       setError("Passcode must be 4 digits");
       return;
     }
@@ -114,37 +128,64 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
     setError("");
 
     try {
-      const profileData = {
-        name: name.trim(),
-        avatar: selectedAvatar,
-        isKids,
-        passcode: hasPasscode ? passcode : undefined,
-      };
-
       if (editingProfile) {
         // Update existing profile
-        updateProfile(editingProfile.id, profileData);
+        const updatedProfile = await updateProfileAPI(editingProfile.id, {
+          name: name.trim(),
+          avatar_url: selectedAvatar,
+          isKids,
+          pin: hasPin ? pin : undefined,
+        });
+
+        updateProfile(editingProfile.id, {
+          id: updatedProfile.id,
+          name: updatedProfile.name,
+          avatar: updatedProfile.avatar_url,
+          isKids: updatedProfile.isKids,
+          pin: updatedProfile.pin,
+          createdAt: new Date(updatedProfile.createdAt),
+        });
       } else {
-        // Create new profile
-        const newProfile: Profile = {
-          id: crypto.randomUUID(),
-          ...profileData,
-          createdAt: new Date(),
-        };
-        addProfile(newProfile);
+        const newProfile = await createProfile({
+          name: name.trim(),
+          avatar_url: selectedAvatar,
+          isKids,
+          pin: hasPin ? pin : undefined,
+        });
+
+        addProfile({
+          id: newProfile.id,
+          name: newProfile.name,
+          avatar: newProfile.avatar_url,
+          isKids: newProfile.isKids,
+          pin: newProfile.pin,
+          createdAt: new Date(newProfile.createdAt),
+        });
       }
 
       resetForm();
-    } catch {
-      setError("Failed to save profile");
+      onClose(); // Close modal after successful save
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to save profile";
+      setError(errorMessage);
+      console.error("Error saving profile:", err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = (profileId: string) => {
-    deleteProfile(profileId);
-    setShowDeleteConfirm(null);
+  const handleDelete = async (profileId: string) => {
+    setIsSaving(true);
+    try {
+      await deleteProfileAPI(profileId);
+      deleteProfile(profileId);
+      setShowDeleteConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete profile");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClose = () => {
@@ -152,78 +193,83 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
     onClose();
   };
 
+  if (!isOpen) return null;
+
   // Edit/Create form view
   if (isCreating || editingProfile) {
     return (
       <ResponsiveModal open={isOpen} onOpenChange={handleClose}>
         <ResponsiveModalContent className="max-w-md">
           <ResponsiveModalHeader>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={resetForm}
-                className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <ArrowLeft className="size-5" />
-              </button>
-              <ResponsiveModalTitle>
-                {editingProfile ? "Edit Profile" : "Add Profile"}
-              </ResponsiveModalTitle>
-            </div>
+            <ResponsiveModalTitle>
+              {editingProfile ? "Edit Profile" : "Add Profile"}
+            </ResponsiveModalTitle>
           </ResponsiveModalHeader>
 
-          <div className="px-4 py-6 space-y-6">
+          <div className="space-y-6 py-4">
             {/* Avatar Selection */}
-            <div className="text-center">
-              <div
-                className={cn(
-                  "w-24 h-24 mx-auto rounded-lg flex items-center justify-center mb-4",
-                  AVATAR_OPTIONS.find((a) => a.id === selectedAvatar)?.color ||
-                    "bg-red-500"
-                )}
-              >
-                <User className="size-12 text-white" />
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {AVATAR_OPTIONS.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    onClick={() => setSelectedAvatar(avatar.id)}
-                    className={cn(
-                      "w-10 h-10 rounded-lg transition-all flex items-center justify-center",
-                      avatar.color,
-                      selectedAvatar === avatar.id && "ring-2 ring-white"
-                    )}
-                  >
-                    {selectedAvatar === avatar.id && (
-                      <Check className="size-5 text-white" />
-                    )}
-                  </button>
-                ))}
+            <div>
+              <label className="block text-sm font-medium mb-3">Avatar</label>
+              <div className="flex items-center gap-4">
+                <div
+                  className={cn(
+                    "w-16 h-16 rounded-lg flex items-center justify-center",
+                    getAvatarColor(selectedAvatar)
+                  )}
+                >
+                  <User className="size-8 text-white" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {AVATAR_OPTIONS.map((avatar) => (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar.id)}
+                      className={cn(
+                        "w-10 h-10 rounded-lg transition-all flex items-center justify-center",
+                        avatar.color,
+                        selectedAvatar === avatar.id && "ring-2 ring-white"
+                      )}
+                    >
+                      {selectedAvatar === avatar.id && (
+                        <Check className="size-5 text-white" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Name Input */}
             <div>
-              <label className="block text-sm font-medium mb-2">Name</label>
+              <label
+                htmlFor="profile-name"
+                className="block text-sm font-medium mb-2"
+              >
+                Name
+              </label>
               <input
+                id="profile-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter profile name"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-brand"
                 maxLength={20}
+                autoFocus
               />
             </div>
 
             {/* Kids Profile Toggle */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">Kids Profile</p>
-                <p className="text-sm text-muted-foreground">
+                <div className="font-medium">Kids Profile</div>
+                <div className="text-sm text-muted-foreground">
                   Show only kids-friendly content
-                </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsKids(!isKids)}
                 className={cn(
                   "w-12 h-7 rounded-full transition-colors relative",
@@ -233,87 +279,86 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
                 <div
                   className={cn(
                     "absolute top-1 w-5 h-5 bg-white rounded-full transition-transform",
-                    isKids ? "translate-x-6" : "translate-x-1"
+                    isKids ? "right-1" : "left-1"
                   )}
                 />
               </button>
             </div>
 
             {/* Passcode Toggle */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {hasPin ? (
+                  <Lock className="size-5 text-muted-foreground" />
+                ) : (
+                  <LockOpen className="size-5 text-muted-foreground" />
+                )}
                 <div>
-                  <p className="font-medium flex items-center gap-2">
-                    {hasPasscode ? (
-                      <Lock className="size-4" />
-                    ) : (
-                      <LockOpen className="size-4" />
-                    )}
-                    Profile Lock
-                  </p>
-                  <p className="text-sm text-muted-foreground">
+                  <div className="font-medium">Profile Lock</div>
+                  <div className="text-sm text-muted-foreground">
                     Require a 4-digit passcode
-                  </p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setHasPasscode(!hasPasscode);
-                    if (!hasPasscode) setPasscode("");
-                  }}
-                  className={cn(
-                    "w-12 h-7 rounded-full transition-colors relative",
-                    hasPasscode ? "bg-brand" : "bg-white/20"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "absolute top-1 w-5 h-5 bg-white rounded-full transition-transform",
-                      hasPasscode ? "translate-x-6" : "translate-x-1"
-                    )}
-                  />
-                </button>
               </div>
-
-              {hasPasscode && (
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={4}
-                    value={passcode}
-                    onChange={setPasscode}
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setHasPin(!hasPin);
+                  if (!hasPin) setPin("");
+                }}
+                className={cn(
+                  "w-12 h-7 rounded-full transition-colors relative",
+                  hasPin ? "bg-brand" : "bg-white/20"
+                )}
+              >
+                <div
+                  className={cn(
+                    "absolute top-1 w-5 h-5 bg-white rounded-full transition-transform",
+                    hasPin ? "right-1" : "left-1"
+                  )}
+                />
+              </button>
             </div>
 
+            {hasPin && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Passcode
+                </label>
+                <InputOTP maxLength={4} value={pin} onChange={setPin}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+            )}
+
             {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
+              <div className="text-red-500 text-sm bg-red-500/10 px-4 py-2 rounded-lg">
+                {error}
+              </div>
             )}
           </div>
 
-          <ResponsiveModalFooter className="px-4 pb-6">
-            <div className="flex gap-3 w-full">
-              <button
-                onClick={resetForm}
-                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex-1 py-3 bg-brand hover:bg-brand/90 disabled:opacity-50 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {isSaving && <Loader2 className="size-4 animate-spin" />}
-                {editingProfile ? "Save" : "Create"}
-              </button>
-            </div>
+          <ResponsiveModalFooter>
+            <button
+              onClick={handleClose}
+              disabled={isSaving}
+              className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-1 py-3 bg-brand hover:bg-brand/90 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSaving && <Loader2 className="size-4 animate-spin" />}
+              {editingProfile ? "Save" : "Create"}
+            </button>
           </ResponsiveModalFooter>
         </ResponsiveModalContent>
       </ResponsiveModal>
@@ -323,128 +368,140 @@ export function ProfileManagement({ isOpen, onClose }: ProfileManagementProps) {
   // Profile list view
   return (
     <ResponsiveModal open={isOpen} onOpenChange={handleClose}>
-      <ResponsiveModalContent className="max-w-md">
+      <ResponsiveModalContent>
         <ResponsiveModalHeader>
           <ResponsiveModalTitle>Manage Profiles</ResponsiveModalTitle>
         </ResponsiveModalHeader>
 
-        <div className="px-4 py-6">
+        <div className="py-4">
           {/* Profiles List */}
           <div className="space-y-3 mb-6">
-            {profiles.map((profile, index) => (
-              <div
-                key={profile.id}
-                className="flex items-center gap-4 p-3 bg-white/5 rounded-xl"
-              >
+            {profiles.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <User className="size-12 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">No profiles yet</p>
+                <p className="text-sm">
+                  Create your first profile to get started
+                </p>
+              </div>
+            ) : (
+              profiles.map((profile, index) => (
                 <div
-                  className={cn(
-                    "w-14 h-14 rounded-lg flex items-center justify-center relative overflow-hidden",
-                    !profile.avatar &&
-                      DEFAULT_AVATAR_COLORS[
-                        index % DEFAULT_AVATAR_COLORS.length
-                      ],
-                    profile.avatar &&
-                      AVATAR_OPTIONS.find((a) => a.id === profile.avatar)?.color
-                  )}
+                  key={profile.id}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                 >
-                  {profile.avatar &&
-                  !AVATAR_OPTIONS.find((a) => a.id === profile.avatar) ? (
-                    <Image
-                      src={profile.avatar}
-                      alt={profile.name}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <User className="size-7 text-white" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{profile.name}</p>
-                    {profile.passcode && (
-                      <Lock className="size-3 text-muted-foreground" />
+                  <div
+                    className={cn(
+                      "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
+                      getAvatarColor(profile.avatar, index)
                     )}
-                    {profile.isKids && (
-                      <span className="text-[10px] bg-yellow-500 text-black font-bold px-1.5 py-0.5 rounded">
-                        KIDS
-                      </span>
+                  >
+                    {!isColorAvatar(profile.avatar) && profile.avatar ? (
+                      <Image
+                        src={profile.avatar}
+                        alt={profile.name}
+                        width={48}
+                        height={48}
+                        className="rounded-lg object-cover"
+                      />
+                    ) : (
+                      <User className="size-6 text-white" />
                     )}
                   </div>
-                </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleStartEdit(profile)}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm(profile.id)}
-                    className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{profile.name}</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {profile.pin && (
+                        <span className="flex items-center gap-1">
+                          <Lock className="size-3" />
+                          Protected
+                        </span>
+                      )}
+                      {profile.isKids && (
+                        <span className="bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">
+                          KIDS
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleStartEdit(profile)}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      aria-label="Edit profile"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(profile.id)}
+                      className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                      aria-label="Delete profile"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Add Profile Button */}
-          {profiles.length < 5 && (
+          {profiles.length < 4 && (
             <button
               onClick={handleStartCreate}
-              className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-white/20 hover:border-white/40 rounded-xl transition-colors"
+              className="w-full py-3 border-2 border-dashed border-white/20 hover:border-white/40 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="size-5" />
-              <span className="font-medium">Add Profile</span>
+              Add Profile
             </button>
           )}
 
-          {profiles.length >= 5 && (
-            <p className="text-center text-sm text-muted-foreground">
-              Maximum 5 profiles allowed
-            </p>
+          {profiles.length >= 4 && (
+            <div className="text-center text-sm text-muted-foreground">
+              Maximum 4 profiles allowed
+            </div>
           )}
         </div>
 
-        <ResponsiveModalFooter className="px-4 pb-6">
+        <ResponsiveModalFooter>
           <button
             onClick={handleClose}
-            className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
+            className="w-full py-3 bg-brand hover:bg-brand/90 rounded-lg font-medium transition-colors"
           >
             Done
           </button>
         </ResponsiveModalFooter>
-      </ResponsiveModalContent>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-110 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2">Delete Profile?</h3>
-            <p className="text-muted-foreground mb-6">
-              This profile and its watch history will be permanently deleted.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(showDeleteConfirm)}
-                className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-lg font-medium transition-colors"
-              >
-                Delete
-              </button>
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 rounded-lg">
+            <div className="bg-zinc-900 p-6 rounded-lg max-w-sm w-full space-y-4">
+              <h3 className="text-lg font-semibold">Delete Profile?</h3>
+              <p className="text-sm text-muted-foreground">
+                This profile and its watch history will be permanently deleted.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  disabled={isSaving}
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(showDeleteConfirm)}
+                  disabled={isSaving}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ResponsiveModalContent>
     </ResponsiveModal>
   );
 }

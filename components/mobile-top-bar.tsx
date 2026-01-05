@@ -1,8 +1,9 @@
 "use client";
 
-import { Search, Bell, ShipWheel } from "lucide-react";
+import { Search, Bell } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export function MobileTopBar() {
   const pathname = usePathname();
@@ -14,7 +15,13 @@ export function MobileTopBar() {
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Logo */}
         <Link href="/" className="shrink-0">
-          <ShipWheel className="text-brand size-5" />
+          <Image
+            src="/icons/icon-192x192.png"
+            alt="Nauhub Logo"
+            width={40}
+            height={40}
+            priority
+          />
         </Link>
 
         {/* Search Bar - Hidden on search page */}

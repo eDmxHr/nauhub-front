@@ -3,50 +3,17 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { useAuthStore } from "@/lib/store";
-import { Profile } from "@/lib/types";
-
-// Fake profiles data for testing
-const FAKE_PROFILES: Profile[] = [
-  {
-    id: "profile-1",
-    name: "John",
-    avatar: "",
-    isKids: false,
-    passcode: undefined,
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    id: "profile-2",
-    name: "Sarah",
-    avatar: "",
-    isKids: false,
-    passcode: "1234",
-    createdAt: new Date("2024-02-15"),
-  },
-  {
-    id: "profile-3",
-    name: "Kids",
-    avatar: "",
-    isKids: true,
-    passcode: undefined,
-    createdAt: new Date("2024-03-01"),
-  },
-];
-
-// Fake user data for testing
-const FAKE_USER = {
-  id: "user-123",
-  mobile: "9123456",
-  name: "Test User",
-  avatar: "",
-  createdAt: new Date("2024-01-01"),
-  profiles: FAKE_PROFILES,
-};
+import { getCurrentUser } from "@/lib/api/auth";
 
 export function UserValidation({ children }: { children: React.ReactNode }) {
-  const { user, login, setActiveProfile, setShowProfileSelector } =
-    useAuthStore();
-  const [, setIsValidating] = useState(true);
+  const {
+    user,
+    login,
+    setActiveProfile,
+    setShowProfileSelector,
+    isLoading,
+    setIsLoading,
+  } = useAuthStore();
 
   useEffect(() => {
     const validateUser = async () => {
@@ -54,45 +21,65 @@ export function UserValidation({ children }: { children: React.ReactNode }) {
       const token = Cookies.get("auth_token");
 
       if (!token) {
-        setIsValidating(false);
+        setIsLoading(false);
         return;
       }
 
+      // If we have a token, we need to fetch user data
+      // Set loading state immediately
+      setIsLoading(true);
+
       // Skip if user is already loaded
       if (user) {
-        setIsValidating(false);
+        setIsLoading(false);
         return;
       }
 
       try {
-        // Use fake data since we don't have API
-        const profiles = FAKE_PROFILES;
+        // Fetch user data from API
+        const userData = await getCurrentUser();
 
-        // Login user to store with fake data
+        // Map profiles correctly: avatar_url -> avatar
+        const mappedProfiles = (userData.profiles || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar_url, // Map avatar_url to avatar
+          isKids: p.isKids,
+          pin: p.pin,
+          createdAt: new Date(p.createdAt),
+        }));
+
+        // Login user to store with API data
         login({
-          ...FAKE_USER,
+          id: userData.id,
+          phone: userData.phone,
+          name: userData.name,
+          avatar: userData.avatar,
           token: token,
-          profiles: profiles,
+          createdAt: new Date(userData.createdAt),
+          profiles: mappedProfiles,
         });
 
         // Check for active_profile cookie using js-cookie
         const activeProfileId = Cookies.get("active_profile");
 
         if (activeProfileId) {
-          const activeProfile = profiles.find((p) => p.id === activeProfileId);
+          const activeProfile = mappedProfiles.find(
+            (p) => p.id === activeProfileId
+          );
 
           if (activeProfile) {
-            // If profile has passcode, show selector for verification
-            if (activeProfile.passcode) {
+            // If profile has pin, show selector for verification
+            if (activeProfile.pin) {
               setShowProfileSelector(true);
             } else {
               setActiveProfile(activeProfile);
             }
-          } else if (profiles.length > 0) {
+          } else if (mappedProfiles.length > 0) {
             // Show profile selector if saved profile not found
             setShowProfileSelector(true);
           }
-        } else if (profiles.length > 0) {
+        } else if (mappedProfiles.length > 0) {
           // Show profile selector if no active profile saved
           setShowProfileSelector(true);
         }
@@ -101,12 +88,12 @@ export function UserValidation({ children }: { children: React.ReactNode }) {
         // Clear invalid token using js-cookie
         Cookies.remove("auth_token", { path: "/" });
       } finally {
-        setIsValidating(false);
+        setIsLoading(false);
       }
     };
 
     validateUser();
-  }, [user, login, setActiveProfile, setShowProfileSelector]);
+  }, [user, login, setActiveProfile, setShowProfileSelector, setIsLoading]);
 
   // Don't block rendering, just validate in background
   return <>{children}</>;

@@ -1,7 +1,7 @@
 // User types
 export interface User {
   id: string;
-  mobile: string;
+  phone: string;
   name?: string;
   avatar?: string;
   token: string; // Auth token from API
@@ -15,19 +15,19 @@ export interface Profile {
   name: string;
   avatar: string;
   isKids: boolean;
-  passcode?: string; // Optional 4-digit passcode for profile lock
+  pin?: string; // Optional 4-digit PIN for profile lock
   createdAt: Date;
 }
 
 // Subscription types
-export type SubscriptionTier = 'free' | 'basic' | 'premium' | 'family';
+export type SubscriptionTier = "free" | "basic" | "premium" | "family";
 
 export interface SubscriptionPlan {
   id: SubscriptionTier;
   name: string;
   price: number;
   currency: string;
-  duration: 'monthly' | 'yearly';
+  duration: "monthly" | "yearly";
   features: string[];
   maxDevices: number;
   description: string;
@@ -38,7 +38,7 @@ export interface UserSubscription {
   planId: SubscriptionTier;
   startDate: Date;
   endDate: Date;
-  status: 'active' | 'expired' | 'pending' | 'cancelled';
+  status: "active" | "expired" | "pending" | "cancelled";
   paymentId?: string;
 }
 
@@ -51,17 +51,17 @@ export interface MoviePurchase {
   currency: string;
   purchaseDate: Date;
   expiresAt?: Date; // Some purchases might expire
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   paymentSlipUrl?: string;
 }
 
 // Payment types
 export interface Payment {
   id: string;
-  type: 'subscription' | 'movie';
+  type: "subscription" | "movie";
   amount: number;
   currency: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   paymentSlipUrl: string;
   createdAt: Date;
   approvedAt?: Date;
@@ -79,6 +79,6 @@ export interface MovieRequest {
   movieId: string;
   movieTitle: string;
   requestDate: Date;
-  status: 'pending' | 'uploaded' | 'rejected';
+  status: "pending" | "uploaded" | "rejected";
   notifyWhenAvailable: boolean;
 }

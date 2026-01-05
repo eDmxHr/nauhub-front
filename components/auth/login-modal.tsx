@@ -3,6 +3,7 @@
 import {
   ResponsiveModal,
   ResponsiveModalContent,
+  ResponsiveModalTitle,
 } from "@/components/ui/responsive-modal";
 import { LoginForm } from "./login-form";
 
@@ -36,6 +37,9 @@ export function LoginModal({
 
   return (
     <ResponsiveModal open={isOpen} onOpenChange={handleOpenChange}>
+      <ResponsiveModalTitle className="sr-only">
+        Login to Your Account
+      </ResponsiveModalTitle>
       <ResponsiveModalContent>
         <div className="px-4 pb-6 md:px-0 md:pb-0">
           <LoginForm

@@ -10,7 +10,7 @@ import { ShowCard } from "@/components/show-card";
 export const metadata: Metadata = generatePageMetadata({
   title: "Home - Stream Movies & TV Shows",
   description:
-    "Discover and stream the best movies and TV shows on Balani. Korean dramas, anime, Hollywood blockbusters, and more. Start watching now!",
+    "Discover and stream the best movies and TV shows on Nauhub. Korean dramas, anime, Hollywood blockbusters, and more. Start watching now!",
   path: "/",
   keywords: ["home", "discover", "trending", "new releases"],
 });

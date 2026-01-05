@@ -40,7 +40,7 @@ export async function generateMetadata({
     movies:
       "Watch the latest and greatest movies online. Hollywood blockbusters, Korean films, Japanese cinema, and more.",
     trending:
-      "Discover what's trending now on Balani. The most popular movies and TV shows everyone is watching.",
+      "Discover what's trending now on Nauhub. The most popular movies and TV shows everyone is watching.",
     "korean-drama":
       "Stream the best Korean dramas (K-dramas) online. Romance, thriller, comedy, and more from Korea.",
     anime:
@@ -51,7 +51,7 @@ export async function generateMetadata({
     title: categoryInfo.name,
     description:
       descriptions[category] ||
-      `Browse ${categoryInfo.name} on Balani. Stream your favorite content online.`,
+      `Browse ${categoryInfo.name} on Nauhub. Stream your favorite content online.`,
     path: `/category/${category}`,
     keywords: [categoryInfo.name, "streaming", "watch online", "free"],
   });

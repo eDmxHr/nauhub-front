@@ -37,13 +37,13 @@ export async function generateMetadata({
 
   const pageDescription =
     show.type === "movie"
-      ? `Watch ${show.title} online on Balani. ${show.description.slice(
+      ? `Watch ${show.title} online on Nauhub. ${show.description.slice(
           0,
           100
         )}...`
       : `Stream ${show.title} episodes online. ${show.seasons ?? 1} season${
           (show.seasons ?? 1) > 1 ? "s" : ""
-        } available on Balani.`;
+        } available on Nauhub.`;
 
   return {
     title: pageTitle,

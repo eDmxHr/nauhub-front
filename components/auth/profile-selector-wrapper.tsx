@@ -6,13 +6,28 @@ import { ProfileManagement } from "./profile-management";
 
 export function ProfileSelectorWrapper() {
   const [showManagement, setShowManagement] = useState(false);
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+
+  const handleCreateProfile = () => {
+    setShowManagement(true);
+    setIsCreatingProfile(true);
+  };
 
   return (
     <>
-      <ProfileSelector onManageProfiles={() => setShowManagement(true)} />
+      {!showManagement && (
+        <ProfileSelector
+          onManageProfiles={() => setShowManagement(true)}
+          onCreateProfile={handleCreateProfile}
+        />
+      )}
       <ProfileManagement
         isOpen={showManagement}
-        onClose={() => setShowManagement(false)}
+        onClose={() => {
+          setShowManagement(false);
+          setIsCreatingProfile(false);
+        }}
+        initialCreateMode={isCreatingProfile}
       />
     </>
   );

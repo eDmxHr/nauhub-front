@@ -102,7 +102,7 @@ export default function EditProfilePage() {
               </label>
               <input
                 type="text"
-                value={user?.mobile || ""}
+                value={user?.phone || ""}
                 disabled
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-muted-foreground cursor-not-allowed"
               />
