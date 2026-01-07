@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { categories, getShowsByCategory } from "@/lib/data";
+import { categories } from "@/lib/data";
 import {
   generatePageMetadata,
   siteConfig,
@@ -65,8 +64,6 @@ export default async function CategoryPage({ params }: PageProps) {
     notFound();
   }
 
-  const categoryShows = getShowsByCategory(category);
-
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Home", url: siteConfig.url },
     { name: categoryInfo.name, url: `${siteConfig.url}/category/${category}` },
@@ -78,39 +75,7 @@ export default async function CategoryPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <Suspense fallback={<CategorySkeleton />}>
-        <CategoryClient
-          categoryName={categoryInfo.name}
-          categoryShows={categoryShows}
-        />
-      </Suspense>
+      <CategoryClient categoryName={categoryInfo.name} categoryId={category} />
     </>
-  );
-}
-
-function CategorySkeleton() {
-  return (
-    <div className="min-h-screen animate-pulse">
-      <div className="sticky top-16 z-40 bg-black/95 backdrop-blur-sm border-b border-white/10 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="h-9 w-20 bg-white/10 rounded-full" />
-          <div className="h-9 w-16 bg-white/10 rounded-full" />
-          <div className="h-9 w-20 bg-white/10 rounded-full" />
-        </div>
-      </div>
-      <div className="px-4 py-4">
-        <div className="h-7 w-32 bg-white/10 rounded" />
-      </div>
-      <div className="px-4 pb-8">
-        <div className="grid grid-cols-3 gap-3">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i}>
-              <div className="aspect-2/3 bg-white/10 rounded-lg" />
-              <div className="mt-2 h-4 w-full bg-white/10 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }

@@ -9,6 +9,7 @@ interface AuthStore {
   activeProfile: Profile | null;
   showProfileSelector: boolean;
   isLoading: boolean;
+  isInitialized: boolean;
   error: string | null;
 
   // Auth actions
@@ -17,8 +18,7 @@ interface AuthStore {
   updateUser: (updates: Partial<User>) => void;
   initialize: () => Promise<void>;
   setIsLoading: (loading: boolean) => void;
-  isInitialized?: boolean;
-  setIsInitialized?: (initialized: boolean) => void;
+  setIsInitialized: (initialized: boolean) => void;
 
   // Profile actions
   setActiveProfile: (profile: Profile | null) => void;
@@ -48,6 +48,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
   activeProfile: null,
   showProfileSelector: false,
   isLoading: false,
+  isInitialized: false, // Track if initialization has completed
   error: null,
 
   // Initialize auth state from cookies
@@ -56,7 +57,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     const profileId = getActiveProfileId();
 
     if (!token) {
-      set({ isLoading: false });
+      set({ isLoading: false, isInitialized: true });
       return;
     }
 
@@ -96,6 +97,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         user: userData,
         activeProfile: restoredProfile,
         isLoading: false,
+        isInitialized: true,
         error: null,
       });
     } catch (error) {
@@ -106,6 +108,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         user: null,
         activeProfile: null,
         isLoading: false,
+        isInitialized: true,
         error:
           error instanceof Error ? error.message : "Failed to initialize auth",
       });
@@ -119,7 +122,6 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
     set({
       user,
-      showProfileSelector: true,
       error: null,
     });
   },
@@ -144,6 +146,8 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
   setIsLoading: (loading) => set({ isLoading: loading }),
 
+  setIsInitialized: (initialized) => set({ isInitialized: initialized }),
+
   // Profile actions
   setActiveProfile: (profile) => {
     if (profile) {
@@ -158,7 +162,9 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     });
   },
 
-  setShowProfileSelector: (show) => set({ showProfileSelector: show }),
+  setShowProfileSelector: (show) => {
+    set({ showProfileSelector: show });
+  },
 
   addProfile: (profile) =>
     set((state) => ({

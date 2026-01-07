@@ -34,10 +34,11 @@ apiClient.interceptors.response.use(
       // Handle specific status codes
       switch (error.response.status) {
         case 401:
-          // Unauthorized - clear auth cookie
-          Cookies.remove("auth_token", { path: "/" });
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
+          // Unauthorized - clear auth cookie only if it exists
+          // Don't redirect automatically, let each page handle auth its own way
+          const token = Cookies.get("auth_token");
+          if (token) {
+            Cookies.remove("auth_token", { path: "/" });
           }
           break;
         case 422:

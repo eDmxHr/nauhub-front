@@ -14,6 +14,7 @@ import {
   Settings,
   CreditCard,
   LogOut,
+  FlameIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store";
@@ -28,6 +29,7 @@ const mainNavItems = [
   { href: "/category/trending", label: "Trending", icon: TrendingUp },
   { href: "/category/movies", label: "Movies", icon: Film },
   { href: "/category/tv-series", label: "TV Series", icon: Tv },
+  { href: "/category/anime", label: "Anime", icon: FlameIcon },
   { href: "/favorites", label: "My List", icon: Heart },
 ];
 
@@ -39,7 +41,7 @@ const accountNavItems = [
 
 export function DesktopSidebar() {
   const pathname = usePathname();
-  const { user, isLoading, logout } = useAuthStore();
+  const { user, isLoading, isInitialized, logout } = useAuthStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isAuthenticated = !!user;
@@ -137,16 +139,16 @@ export function DesktopSidebar() {
 
       {/* User Section */}
       <div className="p-4 border-t border-white/10">
-        {isLoading ? (
-          <div className="space-y-3 px-2 h-20">
+        {!isInitialized || isLoading ? (
+          <div className="space-y-3 px-2">
             <div className="flex items-center gap-3">
               <Skeleton className="size-10 rounded-full" />
-              <div className="flex flex-col space-y-2">
+              <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-3 w-16" />
               </div>
             </div>
-            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-9 w-full rounded-lg" />
           </div>
         ) : isAuthenticated && user ? (
           <div className="space-y-3">

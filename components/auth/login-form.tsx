@@ -28,6 +28,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
   const [error, setError] = useState("");
 
   const login = useAuthStore((state) => state.login);
+  const setShowProfileSelector = useAuthStore((state) => state.setShowProfileSelector);
 
   const handleSendOTP = async () => {
     if (!name.trim()) {
@@ -109,8 +110,15 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
       };
       login(userToStore);
 
-      // Call success callback
+      // Call success callback to close modal first
       onSuccess?.();
+
+      // Show profile selector after a brief delay to allow modal to close
+      if (mappedProfiles.length > 0) {
+        setTimeout(() => {
+          setShowProfileSelector(true);
+        }, 300);
+      }
 
       // Reset form
       resetForm();

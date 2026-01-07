@@ -15,6 +15,7 @@ import {
   generateOrganizationJsonLd,
 } from "@/lib/seo";
 import { ProfileSelectorWrapper } from "@/components/auth/profile-selector-wrapper";
+import { QueryProvider } from "@/providers/query-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -81,26 +82,28 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
       >
-        <UserValidation>
-          <ServiceWorkerRegister />
+        <QueryProvider>
+          <UserValidation>
+            <ServiceWorkerRegister />
 
-          <ProfileSelectorWrapper />
+            <ProfileSelectorWrapper />
 
-          {/* Desktop Layout */}
-          <DesktopSidebar />
-          <DesktopHeader />
+            {/* Desktop Layout */}
+            <DesktopSidebar />
+            <DesktopHeader />
 
-          {/* Mobile Layout */}
-          <MobileTopBar />
-          <MobileBottomNav />
+            {/* Mobile Layout */}
+            <MobileTopBar />
+            <MobileBottomNav />
 
-          {/* Main Content - Responsive padding */}
-          <main className="pt-header-safe pb-nav-safe lg:pt-16 lg:pb-0 lg:ml-64">
-            {children}
-          </main>
+            {/* Main Content - Responsive padding */}
+            <main className="pt-header-safe pb-nav-safe lg:pt-16 lg:pb-0 lg:ml-64">
+              {children}
+            </main>
 
-          <InstallPrompt />
-        </UserValidation>
+            <InstallPrompt />
+          </UserValidation>
+        </QueryProvider>
       </body>
     </html>
   );

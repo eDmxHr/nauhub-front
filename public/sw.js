@@ -137,5 +137,4 @@ self.addEventListener("sync", (event) => {
 
 async function syncFavorites() {
   // Implement background sync logic for favorites
-  console.log("Background sync: syncing favorites");
 }

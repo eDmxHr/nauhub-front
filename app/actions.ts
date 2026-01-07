@@ -23,13 +23,11 @@ export async function subscribeUser(sub: PushSubscription) {
   const endpoint = (sub as unknown as { endpoint: string }).endpoint;
   subscriptions.set(endpoint, sub);
 
-  console.log("User subscribed to push notifications");
   return { success: true };
 }
 
 export async function unsubscribeUser() {
   // In production, you would identify the user and remove their subscription
-  console.log("User unsubscribed from push notifications");
   return { success: true };
 }
 

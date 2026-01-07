@@ -8,57 +8,109 @@ import {
   Play,
   Share2,
   Star,
-  Globe,
   Clock,
   Film,
-  Users,
   Download,
   Heart,
   Bell,
 } from "lucide-react";
-import { useState } from "react";
-import { Show, shows } from "@/lib/data";
+import { useState, useMemo } from "react";
 import { ShowCard } from "@/components/show-card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { MovieRequestModal } from "@/components/movie-request-modal";
 import { LoginModal } from "@/components/auth/login-modal";
 import { useAuthStore } from "@/lib/store";
+import { useVideo } from "@/hooks/use-video";
+import { useVideoSeasons } from "@/hooks/use-video-seasons";
+import { useVideos } from "@/hooks/use-videos";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Genre } from "@/types/genres";
+import { SeasonEpisodes } from "@/components/season-episodes";
+import { formatDuration } from "@/lib/utils";
 
 interface DetailClientProps {
-  show: Show;
+  videoId: string | number;
 }
 
-export function DetailClient({ show }: DetailClientProps) {
+export function DetailClient({ videoId }: DetailClientProps) {
   const router = useRouter();
-  const [selectedSeason, setSelectedSeason] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const { user } = useAuthStore();
   const isAuthenticated = !!user;
-  const isAvailable = show.isAvailable !== false;
 
-  const isMovie = show.type === "movie";
-  const seasonEpisodes = (show.episodes || []).filter(
-    (ep) => ep.season === selectedSeason
+  // Fetch video data
+  const { data: video, isLoading: isLoadingVideo, isError } = useVideo(videoId);
+
+  const isMovie = video?.type === "movie";
+  const isAvailable = video?.is_published !== false;
+
+  // Only fetch seasons for series/anime (not movies)
+  // Don't fetch if video is still loading or if it's a movie
+  const shouldFetchSeasons = Boolean(!isLoadingVideo && video && !isMovie);
+  const { data: seasons = [], isLoading: isLoadingSeasons } = useVideoSeasons(
+    videoId,
+    shouldFetchSeasons
   );
-  const hasEpisodes = show.episodes && show.episodes.length > 0;
-  const similarShows = shows
-    .filter((s) => s.id !== show.id && s.type === show.type)
-    .slice(0, 6);
+
+  // Fetch all videos for similar content
+  const { data: allVideos = [] } = useVideos();
+
+  // Get published seasons
+  const publishedSeasons = seasons.filter((s) => s.is_published);
+
+  // Get similar videos (same type, different id)
+  const similarVideos = useMemo(() => {
+    if (!video) return [];
+    return allVideos
+      .filter(
+        (v) =>
+          v.id !== video.id &&
+          v.type === video.type &&
+          v.is_published &&
+          v.genres?.some((g: Genre) =>
+            video.genres?.some(
+              (vg: Genre) => vg.id === g.id || vg.slug === g.slug
+            )
+          )
+      )
+      .slice(0, 6);
+  }, [allVideos, video]);
 
   const handlePlay = () => {
+    if (!video) return;
+
     // If content is not available, show request modal
     if (!isAvailable) {
       handleRequest();
       return;
     }
+
     // Navigate to watch page
     if (isMovie) {
-      router.push(`/watch/${show.id}`);
+      router.push(`/watch/${video.id}`);
     } else {
-      router.push(`/watch/${show.id}?season=1&episode=1`);
+      // Use the first available season and episode
+      const firstSeason = publishedSeasons[0];
+      if (firstSeason) {
+        // Find first published episode of the first season
+        const firstEpisode = firstSeason.episodes?.find((e) => e.is_published);
+        if (firstEpisode) {
+          router.push(
+            `/watch/${video.id}?season=${firstSeason.season_number}&episode=${firstEpisode.episode_number}`
+          );
+        } else {
+          // Fallback to episode 1 if no published episodes found
+          router.push(
+            `/watch/${video.id}?season=${firstSeason.season_number}&episode=1`
+          );
+        }
+      } else {
+        // Fallback if no seasons available
+        router.push(`/watch/${video.id}?season=1&episode=1`);
+      }
     }
   };
 
@@ -71,26 +123,61 @@ export function DetailClient({ show }: DetailClientProps) {
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: show.title,
-          text: show.description,
-          url: window.location.href,
-        });
-      } catch {
-        // Share cancelled or failed
-      }
+    if (!video || !navigator.share) return;
+    try {
+      await navigator.share({
+        title: video.title,
+        text: video.description,
+        url: window.location.href,
+      });
+    } catch {
+      // Share cancelled or failed
     }
   };
+
+  // Loading state
+  if (isLoadingVideo) {
+    return (
+      <div className="min-h-screen -mt-16 lg:mt-0">
+        <div className="relative h-[55vh] min-h-[420px] lg:h-[70vh] lg:min-h-[500px]">
+          <Skeleton className="w-full h-full" />
+        </div>
+        <div className="px-4 lg:px-6 py-4 space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error or not found state
+  if (isError || !video) {
+    return (
+      <div className="min-h-screen -mt-16 lg:mt-0 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Video Not Found</h1>
+          <p className="text-muted-foreground mb-4">
+            The video you're looking for doesn't exist.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-4 py-2 bg-brand hover:bg-brand/90 rounded-lg"
+          >
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen -mt-16 lg:mt-0">
       {/* Hero Section with Backdrop */}
       <div className="relative h-[55vh] min-h-[420px] lg:h-[70vh] lg:min-h-[500px]">
         <Image
-          src={show.image}
-          alt={show.title}
+          src={video.banner || video.thumbnail || "/placeholder.jpg"}
+          alt={video.title}
           fill
           className="object-cover"
           priority
@@ -111,60 +198,78 @@ export function DetailClient({ show }: DetailClientProps) {
           {/* Type Badge */}
           <div className="flex items-center gap-2 mb-2">
             <span
-              className={`px-2 py-0.5 rounded text-xs font-medium ${"bg-amber-500/20 text-amber-400"}`}
+              className={`px-2 py-0.5 rounded text-xs font-medium ${
+                video.type === "movie"
+                  ? "bg-amber-500/20 text-amber-400"
+                  : video.type === "anime"
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-brand/20 text-brand"
+              }`}
             >
-              {isMovie ? "Movie" : "TV Series"}
+              {video.type === "movie"
+                ? "Movie"
+                : video.type === "anime"
+                ? "Anime"
+                : "TV Series"}
             </span>
-            {show.year && (
-              <span className="text-xs text-muted-foreground">{show.year}</span>
+            {video.release_year && (
+              <span className="text-xs text-muted-foreground">
+                {video.release_year}
+              </span>
+            )}
+            {video.age_rating && (
+              <span className="text-xs text-muted-foreground">
+                {video.age_rating}
+              </span>
             )}
           </div>
 
-          <h1 className="text-2xl lg:text-4xl font-bold mb-3">{show.title}</h1>
+          <h1 className="text-2xl lg:text-4xl font-bold mb-3">{video.title}</h1>
 
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
-            <div className="flex items-center gap-1">
-              <Star className="size-4 text-yellow-500 fill-yellow-500" />
-              <span className="text-white font-semibold">{show.rating}</span>
-            </div>
-            {isMovie && show.duration && (
+            {video.imdb_rating && (
               <div className="flex items-center gap-1">
-                <Clock className="size-4" />
-                <span>{show.duration}</span>
-              </div>
-            )}
-            {!isMovie && show.seasons && (
-              <div className="flex items-center gap-1">
-                <Film className="size-4" />
-                <span>
-                  {show.seasons} Season{show.seasons > 1 ? "s" : ""}
+                <Star className="size-4 text-yellow-500 fill-yellow-500" />
+                <span className="text-white font-semibold">
+                  {video.imdb_rating}
                 </span>
               </div>
             )}
-            {!isMovie && show.duration && (
+            {isMovie && video.duration && (
               <div className="flex items-center gap-1">
                 <Clock className="size-4" />
-                <span>{show.duration}/ep</span>
+                <span>{formatDuration(video.duration)}</span>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              <Globe className="size-4" />
-              <span>{show.country}</span>
-            </div>
+            {!isMovie && seasons.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Film className="size-4" />
+                <span>
+                  {seasons.length} Season{seasons.length > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+            {video.view_count !== undefined && (
+              <div className="flex items-center gap-1">
+                <span>{video.view_count.toLocaleString()} views</span>
+              </div>
+            )}
           </div>
 
           {/* Genres */}
-          <div className="flex flex-wrap gap-2">
-            {show.genre.map((g) => (
-              <span
-                key={g}
-                className="px-2 py-1 bg-white/10 rounded-full text-xs"
-              >
-                {g}
-              </span>
-            ))}
-          </div>
+          {video.genres && video.genres.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {video.genres.map((genre) => (
+                <span
+                  key={genre.id}
+                  className="px-2 py-1 bg-white/10 rounded-full text-xs"
+                >
+                  {genre.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -199,7 +304,7 @@ export function DetailClient({ show }: DetailClientProps) {
           {isAvailable ? (
             <>
               <Play className="size-5 fill-current" />
-              {isMovie ? "Watch Now" : "Play S1:E1"}
+              {isMovie ? "Watch Now" : "Play"}
             </>
           ) : (
             <>
@@ -227,144 +332,63 @@ export function DetailClient({ show }: DetailClientProps) {
       </div>
 
       {/* Description */}
-      <div className="px-4 lg:px-6 pb-4 lg:max-w-3xl">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {show.description}
-        </p>
-      </div>
-
-      {/* Movie-specific: Director & Cast */}
-      {isMovie && (
-        <div className="px-4 lg:px-6 pb-4 space-y-3 lg:max-w-3xl">
-          {show.director && (
-            <div className="flex items-start gap-2">
-              <span className="text-xs text-muted-foreground w-16">
-                Director
-              </span>
-              <span className="text-sm">{show.director}</span>
-            </div>
-          )}
-          {show.cast && show.cast.length > 0 && (
-            <div className="flex items-start gap-2">
-              <span className="text-xs text-muted-foreground w-16">Cast</span>
-              <span className="text-sm">{show.cast.join(", ")}</span>
-            </div>
-          )}
+      {video.description && (
+        <div className="px-4 lg:px-6 pb-4 lg:max-w-3xl">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {video.description}
+          </p>
         </div>
       )}
 
-      {/* TV Series-specific: Season Selector & Episodes */}
-      {!isMovie && hasEpisodes && (
-        <>
-          {/* Season Selector */}
-          {(show.seasons ?? 1) > 1 && (
-            <div className="px-4 lg:px-6 pb-4">
-              <ScrollArea className="w-full whitespace-nowrap">
-                <div className="flex gap-2">
-                  {Array.from(
-                    { length: show.seasons ?? 1 },
-                    (_, i) => i + 1
-                  ).map((season) => (
-                    <button
-                      key={season}
-                      onClick={() => setSelectedSeason(season)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                        selectedSeason === season
-                          ? "bg-brand text-white"
-                          : "bg-white/10 text-muted-foreground hover:bg-white/20"
-                      }`}
-                    >
-                      Season {season}
-                    </button>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            </div>
-          )}
-
-          {/* Episodes */}
-          <div className="px-4 lg:px-6 pb-6">
-            <h2 className="text-lg font-semibold mb-4">
-              Episodes {(show.seasons ?? 1) > 1 && `• Season ${selectedSeason}`}
-            </h2>
-            <div className="space-y-3">
-              {seasonEpisodes.map((episode) => (
-                <Link
-                  key={episode.id}
-                  href={`/watch/${show.id}?season=${episode.season}&episode=${episode.number}`}
-                  className="flex gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  {/* Thumbnail */}
-                  <div className="relative w-28 aspect-video rounded-md overflow-hidden shrink-0">
-                    <Image
-                      src={episode.thumbnail}
-                      alt={episode.title}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
-                        <Play className="size-3 fill-white" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0 py-1">
-                    <h3 className="font-medium text-sm mb-1 line-clamp-1">
-                      E{episode.number}. {episode.title}
+      {/* TV Series-specific: All Seasons with Episodes */}
+      {!isMovie && publishedSeasons.length > 0 && (
+        <div className="px-4 lg:px-6 pb-8">
+          {/* Vertical list of seasons */}
+          <div className="space-y-8">
+            {publishedSeasons.map((season) => {
+              return (
+                <div key={season.id} className="space-y-4">
+                  {/* Season Header */}
+                  <div>
+                    <h3 className="text-base lg:text-lg font-semibold">
+                      Season {season.season_number}
                     </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {episode.duration}
-                    </p>
                   </div>
 
-                  {/* Download */}
-                  <button
-                    onClick={(e) => e.preventDefault()}
-                    className="self-center p-2 hover:bg-white/10 rounded-full transition-colors"
-                  >
-                    <Download className="size-4 text-muted-foreground" />
-                  </button>
-                </Link>
-              ))}
-            </div>
+                  {/* Episodes for this season - fetched from API */}
+                  <SeasonEpisodes
+                    season={season}
+                    videoId={video.id}
+                    videoThumbnail={video.thumbnail}
+                    formatDuration={formatDuration}
+                  />
+                </div>
+              );
+            })}
           </div>
-
-          {/* Cast for TV Series */}
-          {show.cast && show.cast.length > 0 && (
-            <div className="px-4 lg:px-6 pb-6">
-              <h2 className="text-lg font-semibold mb-3">Cast</h2>
-              <div className="flex items-center gap-2">
-                <Users className="size-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  {show.cast.join(", ")}
-                </span>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {/* Similar Shows Section */}
-      <div className="px-4 lg:px-6 pb-8">
-        <h2 className="text-lg font-semibold mb-4">More Like This</h2>
-        <ScrollArea className="w-full whitespace-nowrap">
-          <div className="flex gap-3">
-            {similarShows.map((item) => (
-              <ShowCard key={item.id} show={item} variant="horizontal" />
-            ))}
-          </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-      </div>
+      {/* Similar Videos Section */}
+      {similarVideos.length > 0 && (
+        <div className="px-4 lg:px-6 pb-8">
+          <h2 className="text-lg font-semibold mb-4">More Like This</h2>
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-3">
+              {similarVideos.map((item) => (
+                <ShowCard key={item.id} show={item} variant="horizontal" />
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
 
       {/* Modals */}
       <MovieRequestModal
         isOpen={showRequestModal}
         onClose={() => setShowRequestModal(false)}
-        show={show}
+        show={video as any}
       />
       <LoginModal
         isOpen={showLoginModal}

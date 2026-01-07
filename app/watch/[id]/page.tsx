@@ -1,19 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
-import { getShowById, shows } from "@/lib/data";
-import { siteConfig } from "@/lib/seo";
 import { WatchClient } from "./watch-client";
+import { getVideoById } from "@/lib/api/videos";
+import { siteConfig } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-// Generate static params for all shows
-export async function generateStaticParams() {
-  return shows.map((show) => ({
-    id: show.id,
-  }));
+  searchParams?: Promise<{ season?: string; episode?: string }>;
 }
 
 // Generate dynamic metadata for SEO
@@ -21,29 +14,28 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const show = getShowById(id);
+  const video = await getVideoById(id);
 
-  if (!show) {
+  if (!video) {
     return {
       title: "Not Found",
       description: "The requested content could not be found.",
     };
   }
 
-  const pageTitle =
-    show.type === "movie"
-      ? `Watch ${show.title} (${show.year}) Online`
-      : `Watch ${show.title} - Stream All Episodes`;
+  const isMovie = video.type === "movie";
+  const pageTitle = isMovie
+    ? `Watch ${video.title} Online`
+    : `Watch ${video.title} - Stream All Episodes`;
 
-  const pageDescription =
-    show.type === "movie"
-      ? `Watch ${show.title} online on Nauhub. ${show.description.slice(
-          0,
-          100
-        )}...`
-      : `Stream ${show.title} episodes online. ${show.seasons ?? 1} season${
-          (show.seasons ?? 1) > 1 ? "s" : ""
-        } available on Nauhub.`;
+  const pageDescription = video.description
+    ? `${video.description.slice(0, 100)}...`
+    : `Watch ${video.title} online on Nauhub.`;
+
+  const image = video.banner || video.thumbnail || siteConfig.ogImage;
+  const duration = video.duration
+    ? `PT${Math.floor(video.duration / 60)}M${video.duration % 60}S`
+    : undefined;
 
   return {
     title: pageTitle,
@@ -55,10 +47,10 @@ export async function generateMetadata({
       type: "video.other",
       images: [
         {
-          url: show.image,
-          width: 500,
-          height: 750,
-          alt: show.title,
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: video.title,
         },
       ],
     },
@@ -66,7 +58,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title: pageTitle,
       description: pageDescription,
-      images: [show.image],
+      images: [image],
     },
     robots: {
       index: true,
@@ -75,37 +67,44 @@ export async function generateMetadata({
   };
 }
 
-export default async function WatchPage({ params }: PageProps) {
+export default async function WatchPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
-  const show = getShowById(id);
+  const video = await getVideoById(id);
 
-  if (!show) {
-    notFound();
+  // Generate JSON-LD structured data
+  let videoJsonLd = null;
+
+  if (video) {
+    const duration = video.duration
+      ? `PT${Math.floor(video.duration / 60)}M${video.duration % 60}S`
+      : undefined;
+
+    videoJsonLd = {
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      name: video.title,
+      description: video.description || `Watch ${video.title} on Nauhub`,
+      thumbnailUrl: video.banner || video.thumbnail || siteConfig.ogImage,
+      uploadDate: video.created_at || new Date().toISOString(),
+      duration: duration,
+      contentUrl: `${siteConfig.url}/watch/${id}`,
+      embedUrl: `${siteConfig.url}/watch/${id}`,
+    };
   }
-
-  // Video page JSON-LD
-  const videoJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "VideoObject",
-    name: show.title,
-    description: show.description,
-    thumbnailUrl: show.image,
-    uploadDate: `${show.year}-01-01`,
-    duration: show.duration
-      ? `PT${show.duration.replace(/\s/g, "").toUpperCase()}`
-      : undefined,
-    contentUrl: `${siteConfig.url}/watch/${show.id}`,
-    embedUrl: `${siteConfig.url}/watch/${show.id}`,
-  };
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }}
-      />
+      {videoJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }}
+        />
+      )}
       <Suspense fallback={<WatchSkeleton />}>
-        <WatchClient show={show} />
+        <WatchClient videoId={id} />
       </Suspense>
     </>
   );

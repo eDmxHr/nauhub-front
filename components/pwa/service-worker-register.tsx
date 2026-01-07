@@ -8,11 +8,6 @@ export function ServiceWorkerRegister() {
       navigator.serviceWorker
         .register("/sw.js", { scope: "/", updateViaCache: "none" })
         .then((registration) => {
-          console.log(
-            "Service Worker registered with scope:",
-            registration.scope
-          );
-
           // Check for updates
           registration.addEventListener("updatefound", () => {
             const newWorker = registration.installing;
@@ -23,7 +18,6 @@ export function ServiceWorkerRegister() {
                   navigator.serviceWorker.controller
                 ) {
                   // New content is available
-                  console.log("New content available, please refresh.");
                 }
               });
             }

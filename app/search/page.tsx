@@ -1,42 +1,76 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, X, Clock, TrendingUp } from "lucide-react";
-import { shows } from "@/lib/data";
+import { useState, useMemo, useEffect } from "react";
+import { Search, X, Clock } from "lucide-react";
 import { ShowCard } from "@/components/show-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useVideos } from "@/hooks/use-videos";
+import { useSearchParams } from "next/navigation";
+import { Genre } from "@/types/genres";
 
 // Note: Metadata is exported from a separate file for client components
 // See search/layout.tsx for SEO metadata
 
-const recentSearches = ["Stranger Things", "Korean Drama", "Action Movies"];
-const trendingSearches = ["Squid Game", "The Glory", "Kingdom", "Parasite"];
+const recentSearches = ["Action", "Romance", "Thriller", "Comedy"];
+const trendingSearches = ["Trending Now", "New Releases", "Top Rated", "Popular"];
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") || "";
+  const [query, setQuery] = useState(initialQuery);
+  const { data: videos = [], isLoading } = useVideos();
+
+  // Update query when URL search param changes
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") || "";
+    setQuery(urlQuery);
+  }, [searchParams]);
 
   const searchResults = useMemo(() => {
     if (!query.trim()) return [];
     const lowerQuery = query.toLowerCase();
-    return shows.filter(
-      (show) =>
-        show.title.toLowerCase().includes(lowerQuery) ||
-        show.genre.some((g) => g.toLowerCase().includes(lowerQuery)) ||
-        show.country.toLowerCase().includes(lowerQuery)
-    );
-  }, [query]);
+    
+    return videos.filter((video) => {
+      // Search by title
+      if (video.title.toLowerCase().includes(lowerQuery)) return true;
+      
+      // Search by description
+      if (video.description?.toLowerCase().includes(lowerQuery)) return true;
+      
+      // Search by genres
+      if (video.genres && video.genres.length > 0) {
+        if (video.genres.some((g: Genre) => g.name.toLowerCase().includes(lowerQuery))) {
+          return true;
+        }
+      }
+      
+      // Search by type
+      const typeMatch = 
+        (video.type === "movie" && "movie".includes(lowerQuery)) ||
+        (video.type === "series" && ("series".includes(lowerQuery) || "tv".includes(lowerQuery))) ||
+        (video.type === "anime" && "anime".includes(lowerQuery));
+      if (typeMatch) return true;
+      
+      // Search by year
+      if (video.release_year?.toString().includes(query.trim())) return true;
+      
+      return false;
+    });
+  }, [query, videos]);
 
   const hasResults = searchResults.length > 0;
   const showSuggestions = !query.trim();
+  const isSearching = query.trim() && isLoading;
 
   return (
     <div className="min-h-screen -mt-px">
       {/* Search Input - removed gap by using -mt-px */}
-      <div className="sticky top-13 z-40 bg-black px-4 py-3 border-b border-white/10">
-        <div className="relative">
+      <div className="sticky top-13 lg:top-0 z-40 bg-black px-4 lg:px-6 py-3 border-b border-white/10">
+        <div className="relative max-w-3xl mx-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search movies, TV shows..."
+            placeholder="Search movies, TV shows, anime..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full bg-white/10 rounded-xl py-3 pl-11 pr-10 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50"
@@ -55,12 +89,12 @@ export default function SearchPage() {
 
       {/* Suggestions (when no query) */}
       {showSuggestions && (
-        <div className="px-4 py-4 space-y-6">
-          {/* Recent Searches */}
+        <div className="px-4 lg:px-6 py-4 space-y-6 max-w-3xl mx-auto">
+          {/* Quick Search Tags */}
           <section>
             <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
               <Clock className="size-4" />
-              Recent Searches
+              Quick Search
             </h2>
             <div className="flex flex-wrap gap-2">
               {recentSearches.map((term) => (
@@ -74,45 +108,38 @@ export default function SearchPage() {
               ))}
             </div>
           </section>
+        </div>
+      )}
 
-          {/* Trending Searches */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <TrendingUp className="size-4" />
-              Trending Searches
-            </h2>
-            <div className="space-y-2">
-              {trendingSearches.map((term, index) => (
-                <button
-                  key={term}
-                  onClick={() => setQuery(term)}
-                  className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors text-left"
-                >
-                  <span className="text-lg font-bold text-muted-foreground w-6">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm">{term}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+      {/* Loading State */}
+      {isSearching && (
+        <div className="px-4 lg:px-6 py-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 lg:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Search Results */}
-      {query && (
-        <div className="px-4 py-4">
+      {query && !isSearching && (
+        <div className="px-4 lg:px-6 py-4">
           {hasResults ? (
             <>
               <p className="text-sm text-muted-foreground mb-4">
                 {searchResults.length} result
                 {searchResults.length !== 1 ? "s" : ""} for &quot;{query}&quot;
               </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 lg:gap-4">
-                {searchResults.map((show) => (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 lg:gap-4">
+                {searchResults.map((video) => (
                   <ShowCard
-                    key={show.id}
-                    show={show}
+                    key={video.id}
+                    show={video}
                     variant="compact"
                     showType
                   />

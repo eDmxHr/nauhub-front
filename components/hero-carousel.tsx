@@ -10,13 +10,17 @@ import {
   CarouselItem,
   CarouselDots,
 } from "@/components/ui/carousel";
-import { Show } from "@/lib/data";
+import { Video } from "@/types/video";
 
 interface HeroCarouselProps {
-  items: Show[];
+  items: Video[];
 }
 
 export function HeroCarousel({ items }: HeroCarouselProps) {
+  if (items.length === 0) {
+    return null;
+  }
+
   return (
     <Carousel
       opts={{
@@ -32,13 +36,13 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
       className="w-full"
     >
       <CarouselContent className="ml-0">
-        {items.map((show) => (
-          <CarouselItem key={show.id} className="pl-0">
+        {items.map((video) => (
+          <CarouselItem key={video.id} className="pl-0">
             <div className="relative aspect-16/15">
               {/* Background Image */}
               <Image
-                src={show.image}
-                alt={show.title}
+                src={video.banner || video.thumbnail || "/placeholder.jpg"}
+                alt={video.title}
                 fill
                 className="object-cover"
                 priority
@@ -54,51 +58,65 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      show.type === "movie"
+                      video.type === "movie"
                         ? "bg-amber-500/20 text-amber-400"
+                        : video.type === "anime"
+                        ? "bg-purple-500/20 text-purple-400"
                         : "bg-brand/20 text-brand"
                     }`}
                   >
-                    {show.type === "movie" ? "Movie" : "TV Series"}
+                    {video.type === "movie"
+                      ? "Movie"
+                      : video.type === "anime"
+                      ? "Anime"
+                      : "TV Series"}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <Star className="size-3 text-yellow-500 fill-yellow-500" />
-                    <span className="text-xs font-medium">{show.rating}</span>
-                  </div>
+                  {video.imdb_rating && (
+                    <div className="flex items-center gap-1">
+                      <Star className="size-3 text-yellow-500 fill-yellow-500" />
+                      <span className="text-xs font-medium">
+                        {video.imdb_rating}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Title */}
                 <h2 className="text-xl sm:text-2xl font-bold mb-2 line-clamp-1">
-                  {show.title}
+                  {video.title}
                 </h2>
 
                 {/* Description */}
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-4 max-w-lg">
-                  {show.description}
-                </p>
+                {video.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4 max-w-lg">
+                    {video.description}
+                  </p>
+                )}
 
                 {/* Genres */}
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {show.genre.slice(0, 3).map((g) => (
-                    <span
-                      key={g}
-                      className="px-2 py-0.5 bg-white/10 rounded text-xs"
-                    >
-                      {g}
-                    </span>
-                  ))}
-                </div>
+                {video.genres && video.genres.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    {video.genres.slice(0, 3).map((genre) => (
+                      <span
+                        key={genre.id}
+                        className="px-2 py-0.5 bg-white/10 rounded text-xs"
+                      >
+                        {genre.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
                   <Link
-                    href={`/watch/${show.id}`}
+                    href={`/watch/${video.id}`}
                     className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand/90 rounded-lg font-semibold text-sm transition-colors"
                   >
                     <Play className="size-4 fill-current" />
                   </Link>
                   <Link
-                    href={`/detail/${show.id}`}
+                    href={`/detail/${video.id}`}
                     className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg font-semibold text-sm transition-colors"
                   >
                     <Info className="size-4" />

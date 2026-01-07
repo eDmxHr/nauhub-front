@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getShowById, shows } from "@/lib/data";
+import { DetailClient } from "./detail-client";
+import { getVideoById } from "@/lib/api/videos";
 import {
   generateShowMetadata,
   generateMovieJsonLd,
@@ -8,17 +9,9 @@ import {
   generateBreadcrumbJsonLd,
   siteConfig,
 } from "@/lib/seo";
-import { DetailClient } from "./detail-client";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-// Generate static params for all shows
-export async function generateStaticParams() {
-  return shows.map((show) => ({
-    id: show.id,
-  }));
 }
 
 // Generate dynamic metadata for SEO
@@ -26,86 +19,114 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const show = getShowById(id);
+  const video = await getVideoById(id);
 
-  if (!show) {
+  if (!video) {
     return {
       title: "Not Found",
-      description: "The requested content could not be found.",
+      description: "The requested video could not be found.",
     };
   }
 
+  // Convert Video type to the format expected by generateShowMetadata
+  const type = video.type === "movie" ? "movie" : "tv";
+  const genres = video.genres?.map((g) => g.name) || [];
+  const rating = typeof video.imdb_rating === "string" 
+    ? parseFloat(video.imdb_rating) || 0 
+    : video.imdb_rating || 0;
+  const year = video.release_year || new Date().getFullYear();
+  const image = video.banner || video.thumbnail || siteConfig.ogImage;
+  const description = video.description || `Watch ${video.title} on Nauhub`;
+
   return generateShowMetadata({
-    title: show.title,
-    description: show.description,
-    image: show.image,
-    type: show.type,
-    year: show.year,
-    rating: show.rating,
-    genres: show.genre,
-    country: show.country,
-    id: show.id,
+    title: video.title,
+    description,
+    image,
+    type: type as "movie" | "tv",
+    year,
+    rating,
+    genres,
+    country: "", // Country not available in Video type
+    id: String(video.id),
   });
 }
 
 export default async function DetailPage({ params }: PageProps) {
   const { id } = await params;
-  const show = getShowById(id);
+  // Try to fetch video for SEO, but don't block rendering if it fails
+  // The client component will handle loading/error states
+  const video = await getVideoById(id);
 
-  if (!show) {
-    notFound();
+  // Only generate JSON-LD if we have video data
+  let jsonLd = null;
+  let breadcrumbJsonLd = null;
+
+  if (video) {
+    // Prepare data for JSON-LD
+    const type = video.type === "movie" ? "movie" : "tv";
+    const genres = video.genres?.map((g) => g.name) || [];
+    const rating = typeof video.imdb_rating === "string" 
+      ? parseFloat(video.imdb_rating) || 0 
+      : video.imdb_rating || 0;
+    const year = video.release_year || new Date().getFullYear();
+    const image = video.banner || video.thumbnail || siteConfig.ogImage;
+    const description = video.description || `Watch ${video.title} on Nauhub`;
+    const duration = video.duration 
+      ? `${Math.floor(video.duration / 60)}h ${video.duration % 60}m`
+      : undefined;
+
+    // Generate JSON-LD structured data
+    jsonLd =
+      type === "movie"
+        ? generateMovieJsonLd({
+            title: video.title,
+            description,
+            image,
+            year,
+            rating,
+            duration,
+            genres,
+            id: String(video.id),
+          })
+        : generateTVSeriesJsonLd({
+            title: video.title,
+            description,
+            image,
+            year,
+            rating,
+            seasons: video.seasons?.length || 1,
+            genres,
+            id: String(video.id),
+          });
+
+    breadcrumbJsonLd = generateBreadcrumbJsonLd([
+      { name: "Home", url: siteConfig.url },
+      {
+        name: type === "movie" ? "Movies" : "TV Series",
+        url: `${siteConfig.url}/category/${
+          type === "movie" ? "movies" : video.type === "anime" ? "anime" : "series"
+        }`,
+      },
+      { name: video.title, url: `${siteConfig.url}/detail/${video.id}` },
+    ]);
   }
-
-  // Generate JSON-LD structured data
-  const jsonLd =
-    show.type === "movie"
-      ? generateMovieJsonLd({
-          title: show.title,
-          description: show.description,
-          image: show.image,
-          year: show.year,
-          rating: show.rating,
-          director: show.director,
-          cast: show.cast,
-          duration: show.duration,
-          genres: show.genre,
-          id: show.id,
-        })
-      : generateTVSeriesJsonLd({
-          title: show.title,
-          description: show.description,
-          image: show.image,
-          year: show.year,
-          rating: show.rating,
-          cast: show.cast,
-          seasons: show.seasons,
-          genres: show.genre,
-          id: show.id,
-        });
-
-  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
-    { name: "Home", url: siteConfig.url },
-    {
-      name: show.type === "movie" ? "Movies" : "TV Series",
-      url: `${siteConfig.url}/category/${
-        show.type === "movie" ? "movies" : "tv-series"
-      }`,
-    },
-    { name: show.title, url: `${siteConfig.url}/detail/${show.id}` },
-  ]);
 
   return (
     <>
-      {/* JSON-LD Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-      />
-      <DetailClient show={show} />
+      {/* JSON-LD Structured Data - Only render if we have video data */}
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
+      )}
+      <DetailClient videoId={id} />
     </>
   );
 }
