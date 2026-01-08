@@ -7,7 +7,7 @@ import { useVideo } from "@/hooks/use-video";
 import { useVideoSeasons } from "@/hooks/use-video-seasons";
 import { useSeasonEpisodes } from "@/hooks/use-season-episodes";
 import { useEpisode } from "@/hooks/use-episode";
-import { VideoPlayer } from "@/components/video-player";
+import { VideoPlayerV2 as VideoPlayer } from "@/components/video-player-v2";
 import { Skeleton } from "@/components/ui/skeleton";
 import { incrementVideoView, incrementEpisodeView } from "@/lib/api/views";
 import { formatDuration } from "@/lib/utils";
@@ -111,8 +111,8 @@ export function WatchClient({ videoId }: WatchClientProps) {
   // Loading state
   if (isLoadingVideo) {
     return (
-      <div className="min-h-screen bg-black -mt-16 -mb-20">
-        <div className="pt-16">
+      <div className="min-h-screen bg-black">
+        <div>
           <Skeleton className="w-full aspect-video" />
         </div>
         <div className="px-4 py-4 space-y-2">
@@ -125,7 +125,7 @@ export function WatchClient({ videoId }: WatchClientProps) {
 
   if (!video) {
     return (
-      <div className="min-h-screen bg-black -mt-16 -mb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Video Not Found</h1>
           <p className="text-muted-foreground mb-4">
@@ -154,7 +154,7 @@ export function WatchClient({ videoId }: WatchClientProps) {
 
   if (!cloudflareVideoId) {
     return (
-      <div className="min-h-screen bg-black -mt-16 -mb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Video Not Available</h1>
           <p className="text-muted-foreground">
@@ -166,11 +166,11 @@ export function WatchClient({ videoId }: WatchClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black -mt-16 -mb-20">
+    <div className="min-h-screen bg-black">
       {/* Video Player Section */}
       <div className="relative">
         {/* Top Bar */}
-        <div className="absolute top-16 left-0 right-0 z-20 flex items-center justify-between px-4 py-2">
+        {/* <div className="absolute top-16 left-0 right-0 z-20 flex items-center justify-between px-4 py-2">
           <button
             onClick={() => router.back()}
             className="p-2 bg-black/50 rounded-full backdrop-blur-sm hover:bg-black/70 transition-colors"
@@ -190,15 +190,14 @@ export function WatchClient({ videoId }: WatchClientProps) {
               <Settings className="size-5" />
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Video Player */}
-        <div className="pt-16">
+        <div>
           {cloudflareVideoId ? (
             <VideoPlayer
               videoId={cloudflareVideoId}
               poster={video.banner || video.thumbnail}
-              title={video.title}
               autoplay={true}
               onPlay={handleVideoPlay}
             />

@@ -47,7 +47,7 @@ export function WatchAuthGuard({ show, children }: WatchAuthGuardProps) {
   // Show loading while checking auth
   if (isChecking) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center -mt-16 -mb-20">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="size-8 animate-spin text-brand mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
@@ -59,7 +59,7 @@ export function WatchAuthGuard({ show, children }: WatchAuthGuardProps) {
   // If content unavailable, show nothing (redirect will happen)
   if (show.isAvailable === false) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center -mt-16 -mb-20">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="size-8 animate-spin text-brand mx-auto mb-4" />
           <p className="text-muted-foreground">Redirecting...</p>
@@ -72,7 +72,7 @@ export function WatchAuthGuard({ show, children }: WatchAuthGuardProps) {
   if (!isAuthenticated) {
     return (
       <>
-        <div className="min-h-screen bg-black flex items-center justify-center -mt-16 -mb-20">
+        <div className="min-h-screen bg-black flex items-center justify-center">
           <div className="text-center max-w-md px-4">
             <div className="w-16 h-16 bg-brand/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Loader2 className="size-8 text-brand" />
