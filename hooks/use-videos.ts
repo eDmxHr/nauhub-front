@@ -35,7 +35,11 @@ export function useVideos({
         }>(`/videos?${params.toString()}`);
 
         return Array.isArray(response.data.videos) ? response.data.videos : [];
-      } catch (error) {
+      } catch (error: any) {
+        // Handle 401 gracefully - browsing is allowed without auth
+        if (error?.response?.status === 401) {
+          return [];
+        }
         console.error("Error fetching videos:", error);
         return [];
       }

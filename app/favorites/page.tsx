@@ -3,32 +3,54 @@
 import { useState } from "react";
 import { Heart, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { shows } from "@/lib/data";
 import { ShowCard } from "@/components/show-card";
-
-// Mock favorites - in a real app, this would come from a database/localStorage
-const mockFavorites = shows.slice(0, 4).map((s) => s.id);
+import { useFavorites, useRemoveFromFavorites } from "@/hooks/use-favorites";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuthStore } from "@/lib/store";
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState<string[]>(mockFavorites);
   const [editMode, setEditMode] = useState(false);
+  const { data: favorites = [], isLoading } = useFavorites();
+  const removeFromFavorites = useRemoveFromFavorites();
+  const { user } = useAuthStore();
 
-  const favoriteShows = shows.filter((show) => favorites.includes(show.id));
-
-  const removeFavorite = (id: string) => {
-    setFavorites(favorites.filter((f) => f !== id));
+  const handleRemoveFavorite = (videoId: string | number) => {
+    removeFromFavorites.mutate(videoId);
   };
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen">
+        <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="p-4 bg-white/5 rounded-full mb-4">
+            <Heart className="size-12 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold mb-2">Sign in to view favorites</h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            Please sign in to see your favorite movies and shows
+          </p>
+          <Link
+            href="/"
+            className="px-6 py-2 bg-brand hover:bg-brand/90 rounded-lg font-medium transition-colors"
+          >
+            Go to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="sticky top-16 z-40 bg-black/95 backdrop-blur-sm border-b border-white/10 px-4 py-3">
+      <div className="sticky top-14 lg:top-0 z-40 bg-black/95 backdrop-blur-sm border-b border-white/10 px-4 lg:px-6 py-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">My Favorites</h1>
-          {favoriteShows.length > 0 && (
+          <h1 className="text-xl lg:text-2xl font-bold">My List</h1>
+          {favorites.length > 0 && (
             <button
               onClick={() => setEditMode(!editMode)}
-              className="text-sm text-brand"
+              className="text-sm text-brand hover:text-brand/80 transition-colors"
             >
               {editMode ? "Done" : "Edit"}
             </button>
@@ -37,20 +59,33 @@ export default function FavoritesPage() {
       </div>
 
       {/* Content */}
-      {favoriteShows.length > 0 ? (
-        <div className="px-4 py-4">
+      {isLoading ? (
+        <div className="px-4 lg:px-6 py-4">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 lg:gap-4">
-            {favoriteShows.map((show) => (
-              <div key={show.id} className="relative">
-                <ShowCard show={show} variant="compact" showPlayOverlay />
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : favorites.length > 0 ? (
+        <div className="px-4 lg:px-6 py-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 lg:gap-4">
+            {favorites.map((video) => (
+              <div key={video.id} className="relative">
+                <ShowCard show={video} variant="compact" showPlayOverlay showType />
 
                 {/* Delete button in edit mode */}
                 {editMode && (
                   <button
-                    onClick={() => removeFavorite(show.id)}
-                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 rounded-full shadow-lg z-10"
+                    onClick={() => handleRemoveFavorite(video.id)}
+                    disabled={removeFromFavorites.isPending}
+                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 rounded-full shadow-lg z-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Trash2 className="size-3" />
+                    <Trash2 className="size-3 text-white" />
                   </button>
                 )}
               </div>

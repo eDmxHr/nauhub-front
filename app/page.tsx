@@ -7,11 +7,13 @@ import { ChevronRight } from "lucide-react";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ShowCard } from "@/components/show-card";
 import { useVideos } from "@/hooks/use-videos";
+import { useContinueWatching } from "@/hooks/use-continue-watching";
 import { useMemo } from "react";
 import { Video } from "@/types/video";
 
 export default function Home() {
   const { data: videos = [], isLoading } = useVideos();
+  const { data: continueWatching = [], isLoading: isLoadingContinueWatching } = useContinueWatching();
 
   // Filter videos into categories
   const { featured, trending, tvSeries, movies, anime } = useMemo(() => {
@@ -70,6 +72,16 @@ export default function Home() {
           <HeroCarousel items={featured} />
         )}
       </section>
+
+      {/* Continue Watching Section */}
+      {continueWatching.length > 0 && (
+        <CategorySection
+          title="Continue Watching"
+          categoryId="continue-watching"
+          items={continueWatching}
+          isLoading={isLoadingContinueWatching}
+        />
+      )}
 
       <CategorySection
         title="Trending Now"

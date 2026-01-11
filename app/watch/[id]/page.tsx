@@ -113,7 +113,7 @@ export default async function WatchPage({
 function WatchSkeleton() {
   return (
     <div className="min-h-screen bg-black animate-pulse">
-      <div >
+      <div>
         <div className="aspect-video bg-white/10" />
       </div>
       <div className="px-4 py-4">

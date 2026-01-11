@@ -17,8 +17,10 @@ interface LoginFormProps {
 }
 
 type Step = "phone" | "otp";
+type Mode = "signin" | "signup";
 
 export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
+  const [mode, setMode] = useState<Mode>("signin");
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -29,9 +31,12 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
 
   const login = useAuthStore((state) => state.login);
   const setShowProfileSelector = useAuthStore((state) => state.setShowProfileSelector);
+  const setIsLoading = useAuthStore((state) => state.setIsLoading);
+  const setIsInitialized = useAuthStore((state) => state.setIsInitialized);
 
   const handleSendOTP = async () => {
-    if (!name.trim()) {
+    // For sign up, name is required
+    if (mode === "signup" && !name.trim()) {
       setError("Please enter your name");
       return;
     }
@@ -68,7 +73,8 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
     setError("");
 
     try {
-      const response = await loginAPI(phone, otp, name);
+      // Only send name for sign up
+      const response = await loginAPI(phone, otp, mode === "signup" ? name : undefined);
 
       // First, store the token in auth store and cookies
       // This is needed for the axios interceptor to include it in subsequent requests
@@ -95,6 +101,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
           avatar: p.avatar_url, // Map avatar_url to avatar
           isKids: p.isKids,
           pin: p.pin,
+          hasPin: p.hasPin,
           createdAt: new Date(p.createdAt),
         })) || [];
 
@@ -109,6 +116,10 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
         profiles: mappedProfiles,
       };
       login(userToStore);
+
+      // Mark as initialized and not loading to hide skeleton
+      setIsLoading(false);
+      setIsInitialized(true);
 
       // Call success callback to close modal first
       onSuccess?.();
@@ -140,42 +151,87 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
 
   const resetForm = () => {
     setPhone("");
+    setName("");
     setOtp("");
     setStep("phone");
+    setMode("signin");
     setError("");
   };
 
+  const handleModeChange = (newMode: Mode) => {
+    setMode(newMode);
+    setError("");
+    // Clear name when switching to sign in
+    if (newMode === "signin") {
+      setName("");
+    }
+  };
+
   return (
-    <div className="w-full h-[450px] flex flex-col">
+    <div className="w-full h-[440px] flex flex-col">
       {/* Step 1: Phone Number */}
       {step === "phone" && (
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="mb-6 text-center">
-            <h2 className="text-2xl font-bold mb-2">Sign In</h2>
-            <p className="text-muted-foreground text-sm">
-              Enter your phone number to receive OTP
-            </p>
+          {/* Mode Toggle */}
+          <div className="mb-6 mt-4">
+            <div className="flex items-center gap-2 p-1 bg-white/5 rounded-lg mb-4">
+              <button
+                onClick={() => handleModeChange("signin")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  mode === "signin"
+                    ? "bg-brand text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => handleModeChange("signup")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  mode === "signup"
+                    ? "bg-brand text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {/* Header */}
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">
+                {mode === "signin" ? "Sign In" : "Sign Up"}
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                {mode === "signin"
+                  ? "Enter your phone number to receive OTP"
+                  : "Create an account with your phone number"}
+              </p>
+            </div>
           </div>
 
           {/* Form */}
-          <div className="space-y-4 flex-1 flex flex-col">
-            <div>
-              <label
-                className="text-sm font-medium text-muted-foreground mb-2 block"
-                id="name"
-              >
-                Name
-              </label>
-              <input
-                name="name"
-                placeholder="Enter your name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-white/10 rounded-xl py-3 px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
+          <div className="space-y-4 flex flex-col">
+            {/* Name Input - Only for Sign Up */}
+            {mode === "signup" && (
+              <div className="">
+                <label
+                  className="text-sm font-medium text-muted-foreground mb-2 block"
+                  htmlFor="name"
+                >
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  placeholder="Enter your name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-white/10 rounded-xl py-3 px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
             {/* Phone Input */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -203,13 +259,18 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
               </div>
             </div>
 
-            {/* Spacer */}
-            <div className="flex-1" />
 
-            {/* Send OTP Button */}
+            
+          </div>
+          <div className="mt-auto">
+              {/* Send OTP Button */}
             <button
               onClick={handleSendOTP}
-              disabled={isRequestingOTP || phone.length < 7 || !name.trim()}
+              disabled={
+                isRequestingOTP ||
+                phone.length < 7 ||
+                (mode === "signup" && !name.trim())
+              }
               className="w-full py-3 bg-brand hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
             >
               {isRequestingOTP ? (
@@ -240,12 +301,12 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
               </button>
             )}
 
-            {/* Terms */}
-            <p className="text-xs text-muted-foreground text-center">
+              {/* Terms */}
+              <p className="text-xs text-muted-foreground text-center">
               By continuing, you agree to our Terms of Service and Privacy
               Policy
-            </p>
-          </div>
+              </p>
+            </div>
         </div>
       )}
 
@@ -267,11 +328,16 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
               <p className="text-muted-foreground text-sm">
                 We sent a code to +960 {phone}
               </p>
+              {mode === "signup" && name && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Signing up as {name}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Form */}
-          <div className="space-y-4 flex-1 flex flex-col">
+          <div className="space-y-4 flex flex-col">
             {/* OTP Input */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -309,8 +375,11 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
               </div>
             </div>
 
-            {/* Verify Button */}
-            <button
+           
+          </div>
+          <div className="mt-auto">
+             {/* Verify Button */}
+             <button
               onClick={handleVerifyOTP}
               disabled={isVerifying || otp.length !== 6}
               className="w-full py-3 bg-brand hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
@@ -321,7 +390,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
                   Verifying...
                 </>
               ) : (
-                "Verify & Sign In"
+                `Verify & ${mode === "signin" ? "Sign In" : "Sign Up"}`
               )}
             </button>
 

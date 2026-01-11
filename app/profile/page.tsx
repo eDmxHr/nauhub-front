@@ -21,7 +21,13 @@ import { useAuthStore } from "@/lib/store";
 import { logout as logoutAPI } from "@/lib/api/auth";
 import { LoginModal } from "@/components/auth/login-modal";
 import { ProfileManagement } from "@/components/auth/profile-management";
-import { cn } from "@/lib/utils";
+import { cn, formatText } from "@/lib/utils";
+import {
+  useSubscriptionStatus,
+  useSubscriptionPlans,
+} from "@/hooks/use-subscriptions";
+import { StatusBadge } from "@/components/subscription/status-badge";
+import { formatDate } from "@/lib/utils";
 
 interface MenuItem {
   icon: LucideIcon;
@@ -55,6 +61,16 @@ export default function ProfilePage() {
   const { user, logout, activeProfile, setShowProfileSelector } =
     useAuthStore();
   const isAuthenticated = !!user;
+
+  // Fetch subscription data
+  const { data: currentSubscription, isLoading: isLoadingSubscription } =
+    useSubscriptionStatus();
+  const { data: plans = [] } = useSubscriptionPlans();
+
+  // Find the plan that matches the subscription
+  const currentPlan = currentSubscription
+    ? plans.find((plan) => plan.name === currentSubscription.plan_type)
+    : null;
 
   const menuItems: MenuSection[] = [
     {
@@ -186,67 +202,95 @@ export default function ProfilePage() {
         </button>
       )}
 
-      {/* Subscription Banner */}
-      {isAuthenticated && (
-        <Link href="/subscription">
-          <div className="mx-4 mt-4 p-4 bg-brand-muted rounded-xl border border-brand/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Crown className="size-4 text-brand" />
-                  Upgrade to Premium
-                </h3>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Unlimited streaming from 99 ETB/mo
-                </p>
+      {/* Subscription Details */}
+      {isAuthenticated && !isLoadingSubscription && (
+        <>
+          {/* Active Subscription */}
+          {currentSubscription && currentSubscription.status === "active" && (
+            <Link href="/subscription">
+              <div className="mx-4 mt-4 p-4 bg-muted rounded-xl border border-brand/30">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Crown className="size-4 text-brand" />
+                      <h3 className="font-semibold text-brand">
+                        {formatText(currentPlan?.name || currentSubscription.plan_type)}
+                      </h3>
+                      <StatusBadge status={currentSubscription.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">
+                          Amount
+                        </p>
+                        <p className="text-sm font-medium">
+                          {currentSubscription.amount}{" "}
+                          {currentSubscription.currency}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">
+                          Expires
+                        </p>
+                        <p className="text-sm font-medium">
+                          {formatDate(currentSubscription.end_date)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="size-5 text-muted-foreground mt-1" />
+                </div>
               </div>
-              <ChevronRight className="size-5 text-muted-foreground" />
-            </div>
-          </div>
-        </Link>
+            </Link>
+          )}
+
+          {/* Pending Subscription */}
+          {currentSubscription && currentSubscription.status === "pending" && (
+            <Link href="/subscription">
+              <div className="mx-4 mt-4 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Crown className="size-4 text-yellow-500" />
+                      <h3 className="font-semibold text-yellow-500">
+                        Payment Pending
+                      </h3>
+                      <StatusBadge status={currentSubscription.status} />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Your payment is being reviewed. You'll be notified once
+                      it's approved.
+                    </p>
+                  </div>
+                  <ChevronRight className="size-5 text-muted-foreground mt-1" />
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {/* No Active Subscription - Upgrade Banner */}
+          {(!currentSubscription ||
+            currentSubscription.status === "expired" ||
+            currentSubscription.status === "cancelled") && (
+            <Link href="/subscription">
+              <div className="mx-4 mt-4 p-4 bg-brand-muted rounded-xl border border-brand/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Crown className="size-4 text-brand" />
+                      Upgrade to Premium
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Unlimited streaming from 99 ETB/mo
+                    </p>
+                  </div>
+                  <ChevronRight className="size-5 text-muted-foreground" />
+                </div>
+              </div>
+            </Link>
+          )}
+        </>
       )}
-
-      {/* Active Subscription Info */}
-      {/* {subscription && subscription.status === "active" && (
-        <div className="mx-4 mt-4 p-4 bg-brand-muted rounded-xl border border-brand/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Current Plan</p>
-              <h3 className="font-semibold text-brand">{currentPlan.name}</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Renews: {new Date(subscription.endDate).toLocaleDateString()}
-              </p>
-            </div>
-            <Link
-              href="/subscription"
-              className="px-4 py-2 bg-brand hover:bg-brand/90 rounded-lg text-sm font-medium transition-colors"
-            >
-              Manage
-            </Link>
-          </div>
-        </div>
-      )} */}
-
-      {/* Pending Payment Notice */}
-      {/* {subscription && subscription.status === "pending" && (
-        <div className="mx-4 mt-4 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
-          <div className="flex items-center gap-3">
-            <CreditCard className="size-5 text-yellow-500" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-500">Payment Pending</h3>
-              <p className="text-sm text-muted-foreground">
-                Your payment is being verified
-              </p>
-            </div>
-            <Link
-              href="/profile/payments"
-              className="text-sm text-yellow-500 font-medium"
-            >
-              View
-            </Link>
-          </div>
-        </div>
-      )} */}
 
       {/* Menu Sections */}
       <div className="px-4 py-4 space-y-6">

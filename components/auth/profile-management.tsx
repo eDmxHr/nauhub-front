@@ -50,7 +50,7 @@ export function ProfileManagement({
   onClose,
   initialCreateMode = false,
 }: ProfileManagementProps) {
-  const { user, addProfile, updateProfile, deleteProfile } = useAuthStore();
+  const { user, addProfile, updateProfile, deleteProfile, fetchProfiles } = useAuthStore();
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
@@ -130,21 +130,15 @@ export function ProfileManagement({
     try {
       if (editingProfile) {
         // Update existing profile
-        const updatedProfile = await updateProfileAPI(editingProfile.id, {
+        await updateProfileAPI(editingProfile.id, {
           name: name.trim(),
           avatar_url: selectedAvatar,
           isKids,
           pin: hasPin ? pin : undefined,
         });
 
-        updateProfile(editingProfile.id, {
-          id: updatedProfile.id,
-          name: updatedProfile.name,
-          avatar: updatedProfile.avatar_url,
-          isKids: updatedProfile.isKids,
-          pin: updatedProfile.pin,
-          createdAt: new Date(updatedProfile.createdAt),
-        });
+        // Refetch profiles to get the latest data from backend (including PIN status)
+        await fetchProfiles();
       } else {
         const newProfile = await createProfile({
           name: name.trim(),
@@ -153,14 +147,8 @@ export function ProfileManagement({
           pin: hasPin ? pin : undefined,
         });
 
-        addProfile({
-          id: newProfile.id,
-          name: newProfile.name,
-          avatar: newProfile.avatar_url,
-          isKids: newProfile.isKids,
-          pin: newProfile.pin,
-          createdAt: new Date(newProfile.createdAt),
-        });
+        // Refetch profiles to get the latest data from backend (including PIN status)
+        await fetchProfiles();
       }
 
       resetForm();
@@ -206,7 +194,7 @@ export function ProfileManagement({
             </ResponsiveModalTitle>
           </ResponsiveModalHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 p-4 overflow-y-auto max-h-[90vh]">
             {/* Avatar Selection */}
             <div>
               <label className="block text-sm font-medium mb-3">Avatar</label>

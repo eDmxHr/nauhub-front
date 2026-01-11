@@ -231,6 +231,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         avatar: p.avatar_url,
         isKids: p.isKids,
         pin: p.pin,
+        hasPin: p.hasPin,
         createdAt: new Date(p.createdAt),
       }));
 

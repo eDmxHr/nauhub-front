@@ -23,6 +23,9 @@ interface CategoryClientProps {
 const contentTypes = ["All", "Movies", "Series"] as const;
 type ContentType = (typeof contentTypes)[number];
 
+// Categories where content type filter should be hidden (redundant)
+const categoriesWithoutTypeFilter = ["movies", "tv-series", "anime"];
+
 export function CategoryClient({
   categoryName,
   categoryId,
@@ -36,6 +39,22 @@ export function CategoryClient({
   const [selectedType, setSelectedType] = useState<ContentType>("All");
   const [isFilterVisible, setIsFilterVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if we're on mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024); // lg breakpoint
+    };
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Hide content type filter for specific category pages on desktop only
+  // On mobile, always show the filter so users can switch between Movies/Series
+  const showTypeFilter = isMobile || !categoryId || !categoriesWithoutTypeFilter.includes(categoryId);
 
   const { data: genres = [] } = useGenres();
 
@@ -60,39 +79,63 @@ export function CategoryClient({
   const filteredVideos = useMemo(() => {
     let filtered: Video[] = [...videos];
 
-    // First, filter by the category page we're on
-    if (categoryId) {
-      switch (categoryId) {
-        case "movies":
+    // On mobile, if type filter is shown, let the type filter handle the filtering
+    // On desktop, first filter by category page, then by type filter if shown
+    if (isMobile && showTypeFilter) {
+      // On mobile with type filter, ignore category-based type filtering
+      // Let the type selector handle it
+      if (selectedType === "Movies") {
+        filtered = filtered.filter((video) => video.type === "movie");
+      } else if (selectedType === "Series") {
+        // Series includes both "series" and "anime"
+        filtered = filtered.filter(
+          (video) => video.type === "series" || video.type === "anime"
+        );
+      }
+      // "All" shows everything, no filtering needed
+      
+      // Still apply category-specific filters (like trending)
+      if (categoryId === "trending") {
+        filtered = filtered.filter((video) => video.is_trending);
+      }
+    } else {
+      // Desktop behavior: first filter by category page
+      if (categoryId) {
+        switch (categoryId) {
+          case "movies":
+            filtered = filtered.filter((video) => video.type === "movie");
+            break;
+          case "tv-series":
+          case "series":
+            filtered = filtered.filter((video) => video.type === "series");
+            break;
+          case "anime":
+            filtered = filtered.filter((video) => video.type === "anime");
+            break;
+          case "trending":
+            filtered = filtered.filter((video) => video.is_trending);
+            break;
+          // Add more category filters as needed
+          default:
+            // For other categories, don't filter by type
+            break;
+        }
+      }
+
+      // Then filter by content type selector (only if type filter is shown)
+      // This further narrows down the category filter
+      if (showTypeFilter) {
+        if (selectedType === "Movies") {
           filtered = filtered.filter((video) => video.type === "movie");
-          break;
-        case "tv-series":
-        case "series":
-          filtered = filtered.filter((video) => video.type === "series");
-          break;
-        case "anime":
-          filtered = filtered.filter((video) => video.type === "anime");
-          break;
-        case "trending":
-          filtered = filtered.filter((video) => video.is_trending);
-          break;
-        // Add more category filters as needed
-        default:
-          // For other categories, don't filter by type
-          break;
+        } else if (selectedType === "Series") {
+          // Series includes both "series" and "anime"
+          filtered = filtered.filter(
+            (video) => video.type === "series" || video.type === "anime"
+          );
+        }
+        // "All" shows everything (from the category), no additional filtering needed
       }
     }
-
-    // Then filter by content type selector (this further narrows down the category filter)
-    if (selectedType === "Movies") {
-      filtered = filtered.filter((video) => video.type === "movie");
-    } else if (selectedType === "Series") {
-      // Series includes both "series" and "anime"
-      filtered = filtered.filter(
-        (video) => video.type === "series" || video.type === "anime"
-      );
-    }
-    // "All" shows everything (from the category), no additional filtering needed
 
     // Filter by genre
     if (selectedGenre && selectedGenre !== "all") {
@@ -117,14 +160,16 @@ export function CategoryClient({
     }
 
     return filtered;
-  }, [videos, categoryId, selectedType, selectedGenre, genres]);
+  }, [videos, categoryId, selectedType, selectedGenre, genres, showTypeFilter, isMobile]);
 
   const handleReset = () => {
     setSelectedGenre(undefined);
-    setSelectedType("All");
+    if (showTypeFilter) {
+      setSelectedType("All");
+    }
   };
 
-  const hasFilters = Boolean(selectedGenre) || selectedType !== "All";
+  const hasFilters = Boolean(selectedGenre) || (showTypeFilter && selectedType !== "All");
 
   return (
     <div className="min-h-screen">
@@ -135,24 +180,28 @@ export function CategoryClient({
         }`}
       >
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-          {/* Content Type Filter */}
-          <div className="flex gap-1 shrink-0">
-            {contentTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  selectedType === type
-                    ? "bg-brand text-white"
-                    : "bg-white/10 text-muted-foreground hover:bg-white/20"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
+          {/* Content Type Filter - Only show for categories where it makes sense */}
+          {showTypeFilter && (
+            <>
+              <div className="flex gap-1 shrink-0">
+                {contentTypes.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedType(type)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      selectedType === type
+                        ? "bg-brand text-white"
+                        : "bg-white/10 text-muted-foreground hover:bg-white/20"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
 
-          <div className="w-px h-6 bg-white/20 shrink-0" />
+              <div className="w-px h-6 bg-white/20 shrink-0" />
+            </>
+          )}
 
           <Select
             value={selectedGenre || "all"}

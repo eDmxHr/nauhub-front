@@ -23,3 +23,8 @@ export function formatDuration(minutes?: number): string {
   }
   return `${mins}m`;
 }
+
+
+export function formatText(text:string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

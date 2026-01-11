@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import Cookies from "js-cookie";
 
 // Backend API response type (matches Laravel API)
 interface ProfileApiResponse {
@@ -7,7 +8,8 @@ interface ProfileApiResponse {
   name: string;
   avatar: string | null;
   is_kids_profile: boolean;
-  pin?: string;
+  pin?: string | null;
+  has_pin?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +21,7 @@ export interface ProfileResponse {
   avatar_url: string;
   isKids: boolean;
   pin?: string;
+  hasPin?: boolean;
   createdAt: string;
 }
 
@@ -26,10 +29,11 @@ export interface ProfileResponse {
 function mapProfileResponse(apiProfile: ProfileApiResponse): ProfileResponse {
   return {
     id: String(apiProfile.id),
-    name: apiProfile.name,
+    name: apiProfile.name || "", // Ensure name is never null/undefined
     avatar_url: apiProfile.avatar || "red", // Default to "red" if null
     isKids: apiProfile.is_kids_profile,
-    pin: apiProfile.pin,
+    pin: apiProfile.pin || undefined, // PIN value (if provided by backend)
+    hasPin: apiProfile.has_pin || false, // Use has_pin boolean from backend
     createdAt: apiProfile.created_at,
   };
 }
@@ -121,10 +125,16 @@ export const verifyProfilePin = async (
   profileId: string,
   pin: string
 ): Promise<VerifyPinResponse> => {
+  // Get token from cookie to include in payload
+  const token = Cookies.get("auth_token");
+  
   const response = await apiClient.post<{
     verified: boolean;
     profile: ProfileApiResponse;
-  }>(`/profiles/${profileId}/verify-pin`, { pin });
+  }>(`/profiles/${profileId}/verify-pin`, { 
+    pin,
+    token: token || "", // Include token in payload as required by API
+  });
 
   return {
     verified: response.data.verified,

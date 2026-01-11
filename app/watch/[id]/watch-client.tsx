@@ -197,6 +197,8 @@ export function WatchClient({ videoId }: WatchClientProps) {
           {cloudflareVideoId ? (
             <VideoPlayer
               videoId={cloudflareVideoId}
+              contentVideoId={video.id}
+              episodeId={!isMovie && episodeDetails?.id ? episodeDetails.id : undefined}
               poster={video.banner || video.thumbnail}
               autoplay={true}
               onPlay={handleVideoPlay}

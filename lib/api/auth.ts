@@ -48,6 +48,7 @@ export interface ProfileResponse {
   avatar_url: string;
   isKids: boolean;
   pin?: string;
+  hasPin?: boolean;
   createdAt: string;
 }
 

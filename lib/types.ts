@@ -16,6 +16,7 @@ export interface Profile {
   avatar: string;
   isKids: boolean;
   pin?: string; // Optional 4-digit PIN for profile lock
+  hasPin?: boolean; // Boolean indicating if profile has PIN set
   createdAt: Date;
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import Cookies from "js-cookie";
 import { useAuthStore } from "@/lib/store";
 import { Profile } from "@/lib/types";
 import { Lock, Pencil, User, ArrowLeft, Plus } from "lucide-react";
@@ -32,24 +33,54 @@ export function ProfileSelector({
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [inputKey, setInputKey] = useState(0); // Key to force re-render
+  const inputOTPRef = useRef<React.ComponentRef<typeof InputOTP>>(null);
+
+  // Auto-select saved active profile when selector opens
+  useEffect(() => {
+    if (showProfileSelector && user && !selectedProfile) {
+      const activeProfileId = Cookies.get("active_profile");
+      if (activeProfileId && user.profiles) {
+        const savedProfile = user.profiles.find((p) => p.id === activeProfileId);
+        // Auto-select if profile has PIN (will show PIN screen)
+        // If no PIN, it should have been set directly in user-validation
+        if (savedProfile && savedProfile.hasPin) {
+          setSelectedProfile(savedProfile);
+        }
+      }
+    }
+  }, [showProfileSelector, user, selectedProfile]);
 
   useEffect(() => {
-    if (pin.length === 4 && !isVerifying && selectedProfile) {
+    // Only run if PIN is 4 digits, not currently verifying, and we have a selected profile
+    // Also check if profile selector is still showing (to prevent calls after successful verification)
+    if (pin.length === 4 && !isVerifying && selectedProfile && showProfileSelector) {
       const submitPin = async () => {
+        // Double-check conditions before making API call
+        if (!selectedProfile || !showProfileSelector) return;
+        
         setIsVerifying(true);
         setPinError("");
 
         try {
           const result = await verifyProfilePin(selectedProfile.id, pin);
           if (result.verified) {
+            // Clear state immediately to prevent re-runs
+            setPin("");
+            setSelectedProfile(null);
+            // Set active profile last - this will close the selector
             setActiveProfile(selectedProfile);
           } else {
             setPinError("Incorrect PIN");
             setPin(""); // Clear on error
+            // Force re-render of input to reset focus
+            setInputKey((prev) => prev + 1);
           }
         } catch (err) {
-          setPinError(err instanceof Error ? err.message : "Incorrect PIN");
+          setPinError("Incorrect PIN");
           setPin(""); // Clear on error
+          // Force re-render of input to reset focus
+          setInputKey((prev) => prev + 1);
         } finally {
           setIsVerifying(false);
         }
@@ -57,14 +88,15 @@ export function ProfileSelector({
 
       submitPin();
     }
-  }, [pin, isVerifying, selectedProfile, setActiveProfile]);
+  }, [pin, isVerifying, selectedProfile, showProfileSelector]); // Removed setActiveProfile from deps as it's stable
 
   if (!showProfileSelector || !user) return null;
 
   const profiles = user.profiles || [];
 
   const handleProfileSelect = (profile: Profile) => {
-    if (profile.pin) {
+    // Use hasPin boolean from backend
+    if (profile.hasPin) {
       setSelectedProfile(profile);
       setPin("");
       setPinError("");
@@ -76,6 +108,8 @@ export function ProfileSelector({
   const handlePinSubmit = async (pinValue: string = pin) => {
     if (!selectedProfile) return;
     if (pinValue.length !== 4) return;
+    if (isVerifying) return; // Prevent multiple simultaneous calls
+    if (!showProfileSelector) return; // Don't submit if selector is already closed
 
     setIsVerifying(true);
     setPinError("");
@@ -83,14 +117,21 @@ export function ProfileSelector({
     try {
       const result = await verifyProfilePin(selectedProfile.id, pinValue);
       if (result.verified) {
+        // Clear state before setting active profile to prevent re-runs
+        setPin("");
+        setSelectedProfile(null);
         setActiveProfile(selectedProfile);
       } else {
         setPinError("Incorrect PIN");
         setPin(""); // Clear on error
+        // Force re-render of input to reset focus
+        setInputKey((prev) => prev + 1);
       }
     } catch (err) {
       setPinError(err instanceof Error ? err.message : "Incorrect PIN");
       setPin(""); // Clear on error
+      // Force re-render of input to reset focus
+      setInputKey((prev) => prev + 1);
     } finally {
       setIsVerifying(false);
     }
@@ -149,11 +190,14 @@ export function ProfileSelector({
             <p className="text-muted-foreground mb-4">Enter your profile PIN</p>
             <div className="flex justify-center">
               <InputOTP
+                key={inputKey}
+                ref={inputOTPRef}
                 maxLength={4}
                 value={pin}
                 onChange={(value) => {
-                  setPin(value);
+                  // Always clear error when PIN changes
                   setPinError("");
+                  setPin(value);
                 }}
                 disabled={isVerifying}
                 autoFocus
@@ -222,7 +266,7 @@ export function ProfileSelector({
                   ) : (
                     <User className="size-10 md:size-14 text-white" />
                   )}
-                  {profile.pin && (
+                  {profile.hasPin && (
                     <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-1">
                       <Lock className="size-3" />
                     </div>

@@ -23,6 +23,7 @@ import { useAuthStore } from "@/lib/store";
 import { useVideo } from "@/hooks/use-video";
 import { useVideoSeasons } from "@/hooks/use-video-seasons";
 import { useVideos } from "@/hooks/use-videos";
+import { useToggleFavorite } from "@/hooks/use-favorites";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Genre } from "@/types/genres";
 import { SeasonEpisodes } from "@/components/season-episodes";
@@ -34,12 +35,12 @@ interface DetailClientProps {
 
 export function DetailClient({ videoId }: DetailClientProps) {
   const router = useRouter();
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const { user } = useAuthStore();
   const isAuthenticated = !!user;
+  const { toggle, isFavorite, isLoading: isTogglingFavorite } = useToggleFavorite();
 
   // Fetch video data
   const { data: video, isLoading: isLoadingVideo, isError } = useVideo(videoId);
@@ -314,14 +315,22 @@ export function DetailClient({ videoId }: DetailClientProps) {
           )}
         </button>
         <button
-          onClick={() => setIsFavorite(!isFavorite)}
-          className={`p-3 rounded-lg transition-colors ${
-            isFavorite
+          onClick={() => {
+            if (isAuthenticated) {
+              toggle(videoId);
+            } else {
+              setShowLoginModal(true);
+            }
+          }}
+          disabled={isTogglingFavorite}
+          className={`p-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            isFavorite(videoId)
               ? "bg-red-500/20 text-red-500"
               : "bg-white/10 hover:bg-white/20"
           }`}
+          aria-label={isFavorite(videoId) ? "Remove from favorites" : "Add to favorites"}
         >
-          <Heart className={`size-5 ${isFavorite ? "fill-current" : ""}`} />
+          <Heart className={`size-5 ${isFavorite(videoId) ? "fill-current" : ""}`} />
         </button>
         <button
           onClick={handleShare}

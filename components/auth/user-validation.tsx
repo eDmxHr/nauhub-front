@@ -44,6 +44,7 @@ export function UserValidation({ children }: { children: React.ReactNode }) {
           avatar: p.avatar_url, // Map avatar_url to avatar
           isKids: p.isKids,
           pin: p.pin,
+          hasPin: p.hasPin,
           createdAt: new Date(p.createdAt),
         }));
 
@@ -69,8 +70,9 @@ export function UserValidation({ children }: { children: React.ReactNode }) {
             );
 
             if (activeProfile) {
+              // Use hasPin boolean from backend
               // If profile has pin, show selector for verification
-              if (activeProfile.pin) {
+              if (activeProfile.hasPin) {
                 setShowProfileSelector(true);
               } else {
                 setActiveProfile(activeProfile);
