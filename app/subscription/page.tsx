@@ -13,9 +13,12 @@ import {
   useSubscriptionStatus,
   useSubscriptionHistory,
   useCancelSubscription,
+  useRenewSubscription,
+  useUpgradeSubscription,
 } from "@/hooks/use-subscriptions";
 import { SubscriptionPlan } from "@/types/subscription";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { formatDate, formatText } from "@/lib/utils";
 
 export default function SubscriptionPage() {
@@ -24,12 +27,16 @@ export default function SubscriptionPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"subscribe" | "renew" | "upgrade">("subscribe");
+  const [showSwitchPlanView, setShowSwitchPlanView] = useState(false);
   const isAuthenticated = !!user;
 
   const { data: plans = [], isLoading: isLoadingPlans } = useSubscriptionPlans();
   const { data: currentSubscription, isLoading: isLoadingStatus } = useSubscriptionStatus();
   const { data: subscriptionHistory = [], isLoading: isLoadingHistory } = useSubscriptionHistory();
   const cancelMutation = useCancelSubscription();
+  const renewMutation = useRenewSubscription();
+  const upgradeMutation = useUpgradeSubscription();
 
   const handleSubscribe = (plan: SubscriptionPlan) => {
     if (!isAuthenticated) {
@@ -37,6 +44,27 @@ export default function SubscriptionPage() {
       return;
     }
     setSelectedPlan(plan);
+    setPaymentMode("subscribe");
+    setShowPaymentModal(true);
+  };
+
+  const handleRenew = (plan: SubscriptionPlan) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+    setSelectedPlan(plan);
+    setPaymentMode("renew");
+    setShowPaymentModal(true);
+  };
+
+  const handleUpgrade = (plan: SubscriptionPlan) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+    setSelectedPlan(plan);
+    setPaymentMode("upgrade");
     setShowPaymentModal(true);
   };
 
@@ -62,13 +90,14 @@ export default function SubscriptionPage() {
       {/* Header */}
       <div className="sticky top-14 lg:top-0 z-40 bg-black/95 backdrop-blur-sm border-b border-white/10 px-4 lg:px-6 py-4">
         <div className="flex items-center gap-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => router.back()}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             aria-label="Go back"
           >
             <ArrowLeft className="size-5" />
-          </button>
+          </Button>
           <h1 className="text-xl lg:text-2xl font-bold">Subscription Plans</h1>
         </div>
       </div>
@@ -84,13 +113,15 @@ export default function SubscriptionPage() {
                 <StatusBadge status={currentSubscription.status} />
               </div>
               {hasActiveSubscription && (
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={cancelMutation.isPending}
-                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel Subscription
-                </button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelMutation.isPending}
+                    variant="destructive"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -122,16 +153,57 @@ export default function SubscriptionPage() {
                 </p>
               </div>
             )}
+
+            {/* Renew/Upgrade Options */}
+            {hasActiveSubscription && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <h3 className="text-md font-semibold mb-4">Manage Subscription</h3>
+                <div className="flex flex-wrap gap-3">
+                  {/* Renew Button */}
+                  <Button
+                    onClick={() => {
+                      const currentPlan = plans.find(
+                        (p) => p.name === currentSubscription.plan_type
+                      );
+                      if (currentPlan) {
+                        handleRenew(currentPlan);
+                      }
+                    }}
+                    disabled={renewMutation.isPending}
+                    variant="outline"
+                  >
+                    Renew Plan
+                  </Button>
+                  {/* Switch Plan Button */}
+                  <Button
+                    onClick={() => setShowSwitchPlanView(true)}
+                    variant="secondary"
+                  >
+                    Switch Plan
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Plans Section */}
-        {!hasActiveSubscription && (
+        {(!hasActiveSubscription || showSwitchPlanView) && (
           <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Crown className="size-5 text-brand" />
-            Choose Your Plan
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Crown className="size-5 text-brand" />
+              {showSwitchPlanView ? "Switch to a Different Plan" : "Choose Your Plan"}
+            </h2>
+            {showSwitchPlanView && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowSwitchPlanView(false)}
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
 
           {isLoadingPlans ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -141,15 +213,29 @@ export default function SubscriptionPage() {
             </div>
           ) : plans.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {plans.map((plan) => (
+              {plans.map((plan) => {
+                const isCurrentPlan = showSwitchPlanView && currentSubscription?.plan_type === plan.name;
+                return (
                   <PlanCard
                     key={plan.id}
                     plan={plan}
-                    showSubscribeButton={true}
-                    onSubscribe={handleSubscribe}
-                    disabled={hasActiveSubscription || hasPendingSubscription}
+                    showSubscribeButton={!showSwitchPlanView}
+                    onSubscribe={showSwitchPlanView ? undefined : handleSubscribe}
+                    onSelect={showSwitchPlanView ? (selectedPlan) => {
+                      // Don't allow selecting the current plan
+                      if (currentSubscription?.plan_type === selectedPlan.name) {
+                        return;
+                      }
+                      setSelectedPlan(selectedPlan);
+                      setPaymentMode("upgrade");
+                      setShowPaymentModal(true);
+                      setShowSwitchPlanView(false);
+                    } : undefined}
+                    isSelected={isCurrentPlan}
+                    disabled={isCurrentPlan || (!showSwitchPlanView && (hasActiveSubscription || hasPendingSubscription))}
                   />
-                ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white/5 rounded-xl p-8 text-center">
@@ -216,12 +302,11 @@ export default function SubscriptionPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Create an account or sign in to subscribe to a plan and start streaming.
             </p>
-            <button
+            <Button
               onClick={() => setShowLoginModal(true)}
-              className="px-6 py-2.5 bg-brand hover:bg-brand/90 rounded-lg font-medium transition-colors"
             >
               Sign In
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -242,6 +327,7 @@ export default function SubscriptionPage() {
             setSelectedPlan(null);
           }}
           plan={selectedPlan}
+          mode={paymentMode}
         />
       )}
     </div>

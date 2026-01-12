@@ -50,7 +50,10 @@ apiClient.interceptors.response.use(
             requestUrl.includes("/auth/") || 
             (requestUrl.includes("/profiles") && !isPinVerification) ||
             requestUrl.includes("/watch-history") ||
-            requestUrl.includes("/playlists");
+            requestUrl.includes("/playlists") ||
+            requestUrl.includes("/tickets") ||
+            requestUrl.includes("/support/categories") ||
+            requestUrl.includes("/subscriptions");
           
           if (isAuthEndpoint) {
             // Only clear token if we have one (it might be invalid)

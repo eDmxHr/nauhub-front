@@ -5,6 +5,9 @@ import { ArrowLeft, User, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store";
 import { LoginModal } from "@/components/auth/login-modal";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const AVATAR_COLORS: Record<string, string> = {
@@ -83,48 +86,48 @@ export default function EditProfilePage() {
           {/* Form */}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <Label htmlFor="display-name" className="mb-2">
                 Display Name
-              </label>
-              <input
+              </Label>
+              <Input
+                id="display-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-brand"
                 maxLength={30}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <Label htmlFor="phone-number" className="mb-2">
                 Phone Number
-              </label>
-              <input
+              </Label>
+              <Input
+                id="phone-number"
                 type="text"
                 value={user?.phone || ""}
                 disabled
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-muted-foreground cursor-not-allowed"
+                className="cursor-not-allowed"
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Phone number cannot be changed
               </p>
             </div>
 
-            <button
+            <Button
               onClick={handleSave}
               disabled={isSaving || !name.trim()}
               className={cn(
-                "w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2",
+                "w-full",
                 success
                   ? "bg-green-500 hover:bg-green-600"
-                  : "bg-brand hover:bg-brand/90",
-                (isSaving || !name.trim()) && "opacity-50 cursor-not-allowed"
+                  : "bg-brand hover:bg-brand/90"
               )}
             >
               {isSaving && <Loader2 className="size-4 animate-spin" />}
               {success ? "Saved!" : "Save Changes"}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

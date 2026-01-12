@@ -7,6 +7,8 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/lib/store";
 import { sendOTP, login as loginAPI, getCurrentUser } from "@/lib/api/auth";
 import { AxiosError } from "axios";
@@ -215,34 +217,34 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
             {/* Name Input - Only for Sign Up */}
             {mode === "signup" && (
               <div className="">
-                <label
-                  className="text-sm font-medium text-muted-foreground mb-2 block"
+                <Label
                   htmlFor="name"
+                  className="text-muted-foreground mb-2"
                 >
                   Name
-                </label>
-                <input
+                </Label>
+                <Input
                   id="name"
                   name="name"
                   placeholder="Enter your name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-white/10 rounded-xl py-3 px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             )}
             {/* Phone Input */}
             <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+              <Label htmlFor="phone" className="text-muted-foreground mb-2">
                 Phone Number
-              </label>
+              </Label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground z-10">
                   <Phone className="size-4" />
                   <span className="text-sm">+960</span>
                 </div>
-                <input
+                <Input
+                  id="phone"
                   name="phone"
                   type="tel"
                   placeholder="9XX XXX"
@@ -253,7 +255,7 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
                     setError("");
                   }}
                   disabled={isRequestingOTP}
-                  className="w-full bg-white/10 rounded-xl py-3 pl-24 pr-4 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="pl-24"
                   autoFocus
                 />
               </div>
@@ -341,9 +343,9 @@ export function LoginForm({ onSuccess, onCancel }: LoginFormProps) {
             {/* OTP Input */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-muted-foreground">
+                <Label className="text-muted-foreground">
                   Verification Code
-                </label>
+                </Label>
                 <button
                   onClick={handleSendOTP}
                   disabled={isRequestingOTP}

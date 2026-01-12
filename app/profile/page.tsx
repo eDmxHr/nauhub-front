@@ -208,7 +208,7 @@ export default function ProfilePage() {
           {/* Active Subscription */}
           {currentSubscription && currentSubscription.status === "active" && (
             <Link href="/subscription">
-              <div className="mx-4 mt-4 p-4 bg-muted rounded-xl border border-brand/30">
+              <div className="mx-4 mt-4 p-4 bg-muted rounded-xl">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

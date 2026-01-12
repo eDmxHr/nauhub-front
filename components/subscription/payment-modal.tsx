@@ -3,7 +3,11 @@
 import { useState, useRef } from "react";
 import { X, Upload, Loader2, Copy, Check } from "lucide-react";
 import { SubscriptionPlan, PaymentMethod } from "@/types/subscription";
-import { useSubscribe } from "@/hooks/use-subscriptions";
+import {
+  useSubscribe,
+  useRenewSubscription,
+  useUpgradeSubscription,
+} from "@/hooks/use-subscriptions";
 import {
   Select,
   SelectContent,
@@ -11,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -19,18 +25,27 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+
+type PaymentMode = "subscribe" | "renew" | "upgrade";
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   plan: SubscriptionPlan;
+  mode?: PaymentMode;
 }
 
 const paymentMethods: { value: PaymentMethod; label: string }[] = [
   { value: "bank_transfer", label: "Bank Transfer" },
 ];
 
-export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
+export function PaymentModal({
+  isOpen,
+  onClose,
+  plan,
+  mode = "subscribe",
+}: PaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
@@ -39,6 +54,13 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subscribeMutation = useSubscribe();
+  const renewMutation = useRenewSubscription();
+  const upgradeMutation = useUpgradeSubscription();
+
+  const isPending =
+    subscribeMutation.isPending ||
+    renewMutation.isPending ||
+    upgradeMutation.isPending;
 
   const bankDetails = {
     bankName: "BML",
@@ -98,12 +120,27 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
         return;
       }
  
-      await subscribeMutation.mutateAsync({
-        plan_id: plan.id,
-        payment_method: paymentMethod,
-        proof_image: paymentProof,
-        transaction_id: transactionId || undefined,
-      });
+      if (mode === "renew") {
+        const payload = {
+          plan_id: plan.id,
+          proof_image: paymentProof,
+        };
+        await renewMutation.mutateAsync(payload);
+      } else if (mode === "upgrade") {
+        const payload = {
+          plan_id: plan.id,
+          proof_image: paymentProof,
+        };
+        await upgradeMutation.mutateAsync(payload);
+      } else {
+        const payload = {
+          plan_id: plan.id,
+          payment_method: paymentMethod,
+          proof_image: paymentProof,
+          transaction_id: transactionId || undefined,
+        };
+        await subscribeMutation.mutateAsync(payload);
+      }
       // Close modal on success
       handleClose();
     } catch (err: any) {
@@ -133,7 +170,13 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg scrollbar-hide">
         <DialogHeader>
-          <DialogTitle>Complete Payment</DialogTitle>
+          <DialogTitle>
+            {mode === "renew"
+              ? "Renew Subscription"
+              : mode === "upgrade"
+              ? "Upgrade Subscription"
+              : "Complete Payment"}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Content */}
@@ -149,9 +192,9 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
 
           {/* Payment Method */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <Label className="mb-2">
               Payment Method
-            </label>
+            </Label>
             <Select
               value={paymentMethod}
               onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
@@ -169,8 +212,8 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
             </Select>
           </div>
 
-          {/* Bank Transfer Details Card */}
-          {paymentMethod === "bank_transfer" && (
+          {/* Bank Transfer Details Card - Always show for renew/upgrade, only for bank_transfer in subscribe */}
+          {((mode === "subscribe" && paymentMethod === "bank_transfer") || mode === "renew" || mode === "upgrade") && (
             <div className="bg-white/5 rounded-xl p-6 border border-white/10">
               <h3 className="text-lg font-semibold mb-4">Bank Transfer Details</h3>
               <div className="space-y-2">
@@ -202,10 +245,11 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
                       <p className="font-medium font-mono">{bankDetails.accountNumber}</p>
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => copyToClipboard(bankDetails.accountNumber, "accountNumber")}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                     aria-label="Copy account number"
                   >
                     {copiedField === "accountNumber" ? (
@@ -213,7 +257,7 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
                     ) : (
                       <Copy className="size-4 text-muted-foreground" />
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -221,9 +265,9 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
 
           {/* Payment Proof Upload */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <Label className="mb-2">
               Payment Proof <span className="text-red-500">*</span>
-            </label>
+            </Label>
             {paymentProofPreview ? (
               <div className="relative">
                 <img
@@ -231,19 +275,22 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
                   alt="Payment proof"
                   className="w-full h-48 object-contain rounded-lg border border-white/10"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="icon"
                   onClick={removeImage}
-                  className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full"
+                  className="absolute top-2 right-2 rounded-full"
                 >
                   <X className="size-4" />
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full p-8 border-2 border-dashed border-white/20 rounded-lg hover:border-brand/50 transition-colors flex flex-col items-center justify-center gap-2"
+                className="w-full p-8 border-2 border-dashed hover:border-brand/50 flex flex-col items-center justify-center gap-2 h-auto"
               >
                 <Upload className="size-8 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
@@ -252,7 +299,7 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
                 <span className="text-xs text-muted-foreground">
                   PNG, JPG up to 5MB
                 </span>
-              </button>
+              </Button>
             )}
             <input
               ref={fileInputRef}
@@ -263,19 +310,21 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
             />
           </div>
 
-          {/* Transaction ID */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Transaction ID (Optional)
-            </label>
-            <input
-              type="text"
-              value={transactionId}
-              onChange={(e) => setTransactionId(e.target.value)}
-              placeholder="Enter transaction ID if available"
-              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-brand"
-            />
-          </div>
+          {/* Transaction ID - Only for subscribe mode */}
+          {mode === "subscribe" && (
+            <div>
+              <Label htmlFor="transaction-id" className="mb-2">
+                Transaction ID (Optional)
+              </Label>
+              <Input
+                id="transaction-id"
+                type="text"
+                value={transactionId}
+                onChange={(e) => setTransactionId(e.target.value)}
+                placeholder="Enter transaction ID if available"
+              />
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -293,28 +342,33 @@ export function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
 
         <DialogFooter>
           <DialogClose asChild>
-            <button
+            <Button
               type="button"
-              className="flex-1 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
+              variant="outline"
+              className="flex-1"
             >
               Cancel
-            </button>
+            </Button>
           </DialogClose>
-          <button
+          <Button
             type="submit"
             form="payment-form"
-            disabled={!paymentProof || subscribeMutation.isPending}
-            className="flex-1 px-4 py-2.5 bg-brand hover:bg-brand/90 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={!paymentProof || isPending}
+            className="flex-1"
           >
-            {subscribeMutation.isPending ? (
+            {isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Submitting...
               </>
+            ) : mode === "renew" ? (
+              "Renew Subscription"
+            ) : mode === "upgrade" ? (
+              "Upgrade Subscription"
             ) : (
               "Submit Payment"
             )}
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

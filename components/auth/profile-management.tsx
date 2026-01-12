@@ -33,6 +33,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { Label } from "@/components/ui/label";
 import {
   AVATAR_OPTIONS,
   getAvatarColor,
@@ -197,7 +198,7 @@ export function ProfileManagement({
           <div className="space-y-6 p-4 overflow-y-auto max-h-[90vh]">
             {/* Avatar Selection */}
             <div>
-              <label className="block text-sm font-medium mb-3">Avatar</label>
+              <Label className="mb-3">Avatar</Label>
               <div className="flex items-center gap-4">
                 <div
                   className={cn(
@@ -310,9 +311,9 @@ export function ProfileManagement({
 
             {hasPin && (
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <Label className="mb-2">
                   Passcode
-                </label>
+                </Label>
                 <InputOTP maxLength={4} value={pin} onChange={setPin}>
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
@@ -361,7 +362,7 @@ export function ProfileManagement({
           <ResponsiveModalTitle>Manage Profiles</ResponsiveModalTitle>
         </ResponsiveModalHeader>
 
-        <div className="py-4">
+        <div className="p-4">
           {/* Profiles List */}
           <div className="space-y-3 mb-6">
             {profiles.length === 0 ? (

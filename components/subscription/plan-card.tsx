@@ -2,6 +2,7 @@
 
 import { Check, Crown } from "lucide-react";
 import { SubscriptionPlan } from "@/types/subscription";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface PlanCardProps {
@@ -94,29 +95,24 @@ export function PlanCard({
   {/* Bottom CTA section always sticks to bottom */}
   <div className="p-4 border-t border-white/10 bg-white/5">
     {onSelect && (
-      <button
+      <Button
         onClick={() => !disabled && onSelect(plan)}
         disabled={disabled}
-        className={cn(
-          "w-full py-2.5 rounded-lg font-medium transition-colors mb-2",
-          isSelected
-            ? "bg-brand text-white"
-            : "bg-white/10 hover:bg-white/20",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
+        variant={isSelected ? "default" : "outline"}
+        className="w-full mb-2"
       >
         {isSelected ? "Selected" : "Select Plan"}
-      </button>
+      </Button>
     )}
 
     {showSubscribeButton && onSubscribe && (
-      <button
+      <Button
         onClick={() => !disabled && onSubscribe(plan)}
         disabled={disabled}
-        className="w-full py-3 rounded-lg font-semibold transition-colors bg-brand hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full"
       >
         Subscribe now
-      </button>
+      </Button>
     )}
   </div>
 </div>

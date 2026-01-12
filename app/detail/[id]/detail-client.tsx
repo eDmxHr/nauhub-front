@@ -25,6 +25,7 @@ import { useVideoSeasons } from "@/hooks/use-video-seasons";
 import { useVideos } from "@/hooks/use-videos";
 import { useToggleFavorite } from "@/hooks/use-favorites";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Genre } from "@/types/genres";
 import { SeasonEpisodes } from "@/components/season-episodes";
 import { formatDuration } from "@/lib/utils";
@@ -294,13 +295,10 @@ export function DetailClient({ videoId }: DetailClientProps) {
 
       {/* Action Buttons */}
       <div className="px-4 lg:px-6 py-4 flex gap-3 lg:max-w-3xl">
-        <button
+        <Button
           onClick={handlePlay}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-semibold transition-colors ${
-            isAvailable
-              ? "bg-brand hover:bg-brand/90 text-white"
-              : "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30"
-          }`}
+          variant={isAvailable ? "default" : "outline"}
+          className="flex-1"
         >
           {isAvailable ? (
             <>
@@ -313,8 +311,8 @@ export function DetailClient({ videoId }: DetailClientProps) {
               Request
             </>
           )}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => {
             if (isAuthenticated) {
               toggle(videoId);
@@ -323,21 +321,19 @@ export function DetailClient({ videoId }: DetailClientProps) {
             }
           }}
           disabled={isTogglingFavorite}
-          className={`p-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            isFavorite(videoId)
-              ? "bg-red-500/20 text-red-500"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
+          variant="ghost"
+          size="icon"
           aria-label={isFavorite(videoId) ? "Remove from favorites" : "Add to favorites"}
         >
           <Heart className={`size-5 ${isFavorite(videoId) ? "fill-current" : ""}`} />
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleShare}
-          className="p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          variant="ghost"
+          size="icon"
         >
           <Share2 className="size-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Description */}

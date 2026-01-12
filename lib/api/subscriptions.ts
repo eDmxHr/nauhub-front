@@ -6,6 +6,14 @@ import {
   SubscriptionStatusResponse,
   SubscriptionHistoryResponse,
   SubscriptionPlansResponse,
+  RenewSubscriptionPayload,
+  UpgradeSubscriptionPayload,
+  RequestRefundPayload,
+  RequestRefundResponse,
+  RenewSubscriptionResponse,
+  UpgradeSubscriptionResponse,
+  Payment,
+  PaymentHistoryResponse,
 } from "@/types/subscription";
 
 /**
@@ -55,6 +63,24 @@ export async function getSubscriptionHistory(): Promise<Subscription[]> {
 }
 
 /**
+ * Get payment history for authenticated user
+ */
+export async function getPaymentHistory(): Promise<Payment[]> {
+  try {
+    const response = await apiClient.get<PaymentHistoryResponse>(
+      "/subscriptions/payments"
+    );
+    return response.data.payments || [];
+  } catch (error: any) {
+    // Handle 401 gracefully (user not authenticated)
+    if (error.response?.status === 401) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
  * Subscribe to a plan
  */
 export async function subscribe(
@@ -89,6 +115,63 @@ export async function subscribe(
 export async function cancelSubscription(): Promise<{ message: string }> {
   const response = await apiClient.post<{ message: string }>(
     "/subscriptions/cancel"
+  );
+  return response.data;
+}
+
+/**
+ * Renew current subscription
+ */
+export async function renewSubscription(
+  payload: RenewSubscriptionPayload
+): Promise<RenewSubscriptionResponse> {
+  const formData = new FormData();
+  
+  formData.append("plan_id", String(payload.plan_id));
+  
+  if (!(payload.proof_image instanceof File)) {
+    throw new Error("proof_image must be a File object");
+  }
+  formData.append("proof_image", payload.proof_image);
+
+  const response = await apiClient.post<RenewSubscriptionResponse>(
+    "/subscriptions/renew",
+    formData
+  );
+  return response.data;
+}
+
+/**
+ * Upgrade current subscription
+ */
+export async function upgradeSubscription(
+  payload: UpgradeSubscriptionPayload
+): Promise<UpgradeSubscriptionResponse> {
+  const formData = new FormData();
+  
+  formData.append("plan_id", String(payload.plan_id));
+  
+  if (!(payload.proof_image instanceof File)) {
+    throw new Error("proof_image must be a File object");
+  }
+  formData.append("proof_image", payload.proof_image);
+
+  const response = await apiClient.post<UpgradeSubscriptionResponse>(
+    "/subscriptions/upgrade",
+    formData
+  );
+  return response.data;
+}
+
+/**
+ * Request a refund
+ */
+export async function requestRefund(
+  payload: RequestRefundPayload
+): Promise<RequestRefundResponse> {
+  const response = await apiClient.post<RequestRefundResponse>(
+    "/subscriptions/request-refund",
+    payload
   );
   return response.data;
 }
