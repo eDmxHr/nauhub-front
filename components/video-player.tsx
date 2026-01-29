@@ -46,7 +46,9 @@ export function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
+    null,
+  );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -64,13 +66,16 @@ export function VideoPlayer({
     const findVideoElement = () => {
       if (!containerRef.current) return;
 
-      const iframe = containerRef.current.querySelector("iframe") as HTMLIFrameElement;
+      const iframe = containerRef.current.querySelector(
+        "iframe",
+      ) as HTMLIFrameElement;
       if (iframe) {
         iframeRef.current = iframe;
-        
+
         // Try to access video element through iframe (may be blocked by CORS)
         try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          const iframeDoc =
+            iframe.contentDocument || iframe.contentWindow?.document;
           if (iframeDoc) {
             const video = iframeDoc.querySelector("video");
             if (video) {
@@ -190,164 +195,190 @@ export function VideoPlayer({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handlePlayPause = useCallback(
+    async (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      if (isLoading) return;
 
-  const handlePlayPause = useCallback(async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (isLoading) return;
+      try {
+        if (isPlaying) {
+          // Pause
+          if (videoElement && videoElement.pause) {
+            videoElement.pause();
+          } else if (streamRef.current?.pause) {
+            streamRef.current.pause();
+          }
+        } else {
+          // Play - ensure not muted when user manually plays (unless volume is 0)
+          if (videoElement instanceof HTMLVideoElement) {
+            if (volume > 0) {
+              videoElement.muted = false;
+              setIsMuted(false);
+            }
+            const playPromise = videoElement.play();
+            if (playPromise instanceof Promise) {
+              await playPromise.catch((error: any) => {
+                console.log("Play failed:", error);
+              });
+            }
+          } else if (streamRef.current) {
+            // Use streamRef methods
+            if (volume > 0 && streamRef.current.muted !== undefined) {
+              streamRef.current.muted = false;
+              setIsMuted(false);
+            }
+            const playPromise = streamRef.current.play?.();
+            if (playPromise instanceof Promise) {
+              await playPromise.catch((error: any) => {
+                console.log("Play failed:", error);
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error playing/pausing video:", error);
+        setHasError(true);
+      }
+    },
+    [isLoading, isPlaying, volume, videoElement],
+  );
 
-    try {
-      if (isPlaying) {
-        // Pause
-        if (videoElement && videoElement.pause) {
-          videoElement.pause();
-        } else if (streamRef.current?.pause) {
-          streamRef.current.pause();
+  const handleSeek = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const time = parseFloat(e.target.value);
+      if (videoElement && videoElement.currentTime !== undefined) {
+        videoElement.currentTime = time;
+      } else if (streamRef.current?.currentTime !== undefined) {
+        streamRef.current.currentTime = time;
+      }
+      setCurrentTime(time);
+    },
+    [videoElement],
+  );
+
+  const handleSkip = useCallback(
+    (seconds: number) => {
+      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      if (videoElement && videoElement.currentTime !== undefined) {
+        videoElement.currentTime = newTime;
+      } else if (streamRef.current?.currentTime !== undefined) {
+        streamRef.current.currentTime = newTime;
+      }
+      setCurrentTime(newTime);
+    },
+    [videoElement, duration, currentTime],
+  );
+
+  const toggleMute = useCallback(
+    (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      const newMutedState = !isMuted;
+
+      // Try to click the native mute button in the iframe
+      if (iframeRef.current) {
+        try {
+          const iframeDoc =
+            iframeRef.current.contentDocument ||
+            iframeRef.current.contentWindow?.document;
+          if (iframeDoc) {
+            // Find and click the native mute button
+            const muteButton = iframeDoc.querySelector(
+              'button[aria-label*="mute" i], button[aria-label*="volume" i], .vjs-mute-control, [class*="mute"]',
+            ) as HTMLButtonElement;
+            if (muteButton) {
+              muteButton.click();
+              setIsMuted(newMutedState);
+              return;
+            }
+          }
+        } catch (err) {
+          // CORS blocked
+        }
+      }
+
+      // Fallback to direct video element access
+      if (videoElement instanceof HTMLVideoElement) {
+        videoElement.muted = newMutedState;
+        setIsMuted(newMutedState);
+      } else if (streamRef.current) {
+        // Try to set muted on streamRef
+        if (typeof streamRef.current.muted !== "undefined") {
+          streamRef.current.muted = newMutedState;
+          setIsMuted(newMutedState);
+        } else {
+          setIsMuted(newMutedState);
         }
       } else {
-        // Play - ensure not muted when user manually plays (unless volume is 0)
-        if (videoElement instanceof HTMLVideoElement) {
-          if (volume > 0) {
-            videoElement.muted = false;
-            setIsMuted(false);
+        setIsMuted(newMutedState);
+      }
+    },
+    [videoElement, isMuted],
+  );
+
+  const handleVolumeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newVolume = parseFloat(e.target.value);
+      setVolume(newVolume);
+
+      // Try to set volume through iframe video element
+      if (iframeRef.current) {
+        try {
+          const iframeDoc =
+            iframeRef.current.contentDocument ||
+            iframeRef.current.contentWindow?.document;
+          if (iframeDoc) {
+            const video = iframeDoc.querySelector("video");
+            if (video) {
+              video.volume = newVolume;
+              // Auto-unmute when volume is increased
+              if (newVolume > 0 && video.muted) {
+                video.muted = false;
+                setIsMuted(false);
+              }
+              // Auto-mute when volume is set to 0
+              if (newVolume === 0 && !video.muted) {
+                video.muted = true;
+                setIsMuted(true);
+              }
+              return;
+            }
           }
-          const playPromise = videoElement.play();
-          if (playPromise instanceof Promise) {
-            await playPromise.catch((error: any) => {
-              console.log("Play failed:", error);
-            });
-          }
-        } else if (streamRef.current) {
-          // Use streamRef methods
-          if (volume > 0 && streamRef.current.muted !== undefined) {
+        } catch (err) {
+          // CORS blocked
+        }
+      }
+
+      // Fallback to direct video element access
+      if (videoElement instanceof HTMLVideoElement) {
+        videoElement.volume = newVolume;
+        if (newVolume > 0 && videoElement.muted) {
+          videoElement.muted = false;
+          setIsMuted(false);
+        }
+        if (newVolume === 0 && !videoElement.muted) {
+          videoElement.muted = true;
+          setIsMuted(true);
+        }
+      } else if (streamRef.current) {
+        if (typeof streamRef.current.volume !== "undefined") {
+          streamRef.current.volume = newVolume;
+        }
+        if (typeof streamRef.current.muted !== "undefined") {
+          if (newVolume > 0 && streamRef.current.muted) {
             streamRef.current.muted = false;
             setIsMuted(false);
           }
-          const playPromise = streamRef.current.play?.();
-          if (playPromise instanceof Promise) {
-            await playPromise.catch((error: any) => {
-              console.log("Play failed:", error);
-            });
+          if (newVolume === 0 && !streamRef.current.muted) {
+            streamRef.current.muted = true;
+            setIsMuted(true);
           }
-        }
-      }
-    } catch (error) {
-      console.error("Error playing/pausing video:", error);
-      setHasError(true);
-    }
-  }, [isLoading, isPlaying, volume, videoElement]);
-
-  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    if (videoElement && videoElement.currentTime !== undefined) {
-      videoElement.currentTime = time;
-    } else if (streamRef.current?.currentTime !== undefined) {
-      streamRef.current.currentTime = time;
-    }
-    setCurrentTime(time);
-  }, [videoElement]);
-
-  const handleSkip = useCallback((seconds: number) => {
-    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-    if (videoElement && videoElement.currentTime !== undefined) {
-      videoElement.currentTime = newTime;
-    } else if (streamRef.current?.currentTime !== undefined) {
-      streamRef.current.currentTime = newTime;
-    }
-    setCurrentTime(newTime);
-  }, [videoElement, duration, currentTime]);
-
-  const toggleMute = useCallback((e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const newMutedState = !isMuted;
-    
-    // Try to click the native mute button in the iframe
-    if (iframeRef.current) {
-      try {
-        const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-        if (iframeDoc) {
-          // Find and click the native mute button
-          const muteButton = iframeDoc.querySelector('button[aria-label*="mute" i], button[aria-label*="volume" i], .vjs-mute-control, [class*="mute"]') as HTMLButtonElement;
-          if (muteButton) {
-            muteButton.click();
-            setIsMuted(newMutedState);
-            return;
+        } else {
+          if (newVolume > 0 && isMuted) {
+            setIsMuted(false);
           }
-        }
-      } catch (err) {
-        // CORS blocked
-      }
-    }
-    
-    // Fallback to direct video element access
-    if (videoElement instanceof HTMLVideoElement) {
-      videoElement.muted = newMutedState;
-      setIsMuted(newMutedState);
-    } else if (streamRef.current) {
-      // Try to set muted on streamRef
-      if (typeof streamRef.current.muted !== "undefined") {
-        streamRef.current.muted = newMutedState;
-        setIsMuted(newMutedState);
-      } else {
-        setIsMuted(newMutedState);
-      }
-    } else {
-      setIsMuted(newMutedState);
-    }
-  }, [videoElement, isMuted]);
-
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    
-    // Try to set volume through iframe video element
-    if (iframeRef.current) {
-      try {
-        const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-        if (iframeDoc) {
-          const video = iframeDoc.querySelector("video");
-          if (video) {
-            video.volume = newVolume;
-            // Auto-unmute when volume is increased
-            if (newVolume > 0 && video.muted) {
-              video.muted = false;
-              setIsMuted(false);
-            }
-            // Auto-mute when volume is set to 0
-            if (newVolume === 0 && !video.muted) {
-              video.muted = true;
-              setIsMuted(true);
-            }
-            return;
+          if (newVolume === 0 && !isMuted) {
+            setIsMuted(true);
           }
-        }
-      } catch (err) {
-        // CORS blocked
-      }
-    }
-    
-    // Fallback to direct video element access
-    if (videoElement instanceof HTMLVideoElement) {
-      videoElement.volume = newVolume;
-      if (newVolume > 0 && videoElement.muted) {
-        videoElement.muted = false;
-        setIsMuted(false);
-      }
-      if (newVolume === 0 && !videoElement.muted) {
-        videoElement.muted = true;
-        setIsMuted(true);
-      }
-    } else if (streamRef.current) {
-      if (typeof streamRef.current.volume !== "undefined") {
-        streamRef.current.volume = newVolume;
-      }
-      if (typeof streamRef.current.muted !== "undefined") {
-        if (newVolume > 0 && streamRef.current.muted) {
-          streamRef.current.muted = false;
-          setIsMuted(false);
-        }
-        if (newVolume === 0 && !streamRef.current.muted) {
-          streamRef.current.muted = true;
-          setIsMuted(true);
         }
       } else {
         if (newVolume > 0 && isMuted) {
@@ -357,15 +388,9 @@ export function VideoPlayer({
           setIsMuted(true);
         }
       }
-    } else {
-      if (newVolume > 0 && isMuted) {
-        setIsMuted(false);
-      }
-      if (newVolume === 0 && !isMuted) {
-        setIsMuted(true);
-      }
-    }
-  }, [videoElement, isMuted]);
+    },
+    [videoElement, isMuted],
+  );
 
   const toggleFullscreen = useCallback(async () => {
     const container = containerRef.current;
@@ -397,10 +422,14 @@ export function VideoPlayer({
       // Try to click the native fullscreen button in the iframe first
       if (iframeRef.current) {
         try {
-          const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+          const iframeDoc =
+            iframeRef.current.contentDocument ||
+            iframeRef.current.contentWindow?.document;
           if (iframeDoc) {
             // Find and click the native fullscreen button
-            const fullscreenButton = iframeDoc.querySelector('button[aria-label*="fullscreen" i], button[aria-label*="full screen" i], .vjs-fullscreen-control, [class*="fullscreen"]') as HTMLButtonElement;
+            const fullscreenButton = iframeDoc.querySelector(
+              'button[aria-label*="fullscreen" i], button[aria-label*="full screen" i], .vjs-fullscreen-control, [class*="fullscreen"]',
+            ) as HTMLButtonElement;
             if (fullscreenButton) {
               fullscreenButton.click();
               return;
@@ -476,11 +505,15 @@ export function VideoPlayer({
         iframe.style.border = "none";
         // Ensure fullscreen is allowed
         iframe.setAttribute("allowfullscreen", "true");
-        iframe.setAttribute("allow", "accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;");
-        
+        iframe.setAttribute(
+          "allow",
+          "accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;",
+        );
+
         // Try to hide native controls by injecting styles into iframe
         try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          const iframeDoc =
+            iframe.contentDocument || iframe.contentWindow?.document;
           if (iframeDoc) {
             // Check if style already exists
             let styleEl = iframeDoc.getElementById("hide-native-controls");
@@ -546,19 +579,40 @@ export function VideoPlayer({
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenStateChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenStateChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenStateChange);
-    document.addEventListener("MSFullscreenChange", handleFullscreenStateChange);
+    document.addEventListener(
+      "webkitfullscreenchange",
+      handleFullscreenStateChange,
+    );
+    document.addEventListener(
+      "mozfullscreenchange",
+      handleFullscreenStateChange,
+    );
+    document.addEventListener(
+      "MSFullscreenChange",
+      handleFullscreenStateChange,
+    );
 
     return () => {
       clearTimeout(timeout1);
       clearTimeout(timeout2);
       clearTimeout(timeout3);
       if (observer) observer.disconnect();
-      document.removeEventListener("fullscreenchange", handleFullscreenStateChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenStateChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenStateChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenStateChange);
+      document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreenStateChange,
+      );
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenStateChange,
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenStateChange,
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenStateChange,
+      );
     };
   }, [videoId]);
 
@@ -717,8 +771,10 @@ export function VideoPlayer({
 
       {/* Custom Controls Overlay */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity pointer-events-none z-20 ${
-          (showControls || isFullscreen) && !hasError && !isLoading ? "opacity-100" : "opacity-0"
+        className={`absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/40 transition-opacity pointer-events-none z-20 ${
+          (showControls || isFullscreen) && !hasError && !isLoading
+            ? "opacity-100"
+            : "opacity-0"
         }`}
       >
         {/* Title */}
@@ -824,7 +880,9 @@ export function VideoPlayer({
               <button
                 onClick={toggleFullscreen}
                 className="text-white hover:text-brand transition-colors touch-manipulation z-30"
-                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-label={
+                  isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                }
               >
                 {isFullscreen ? (
                   <Maximize className="size-5 rotate-45" />

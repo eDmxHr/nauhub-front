@@ -33,7 +33,7 @@ export function CategoryClient({
   const searchParams = useSearchParams();
 
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>(
-    searchParams.get("genre") || undefined
+    searchParams.get("genre") || undefined,
   );
 
   const [selectedType, setSelectedType] = useState<ContentType>("All");
@@ -46,7 +46,7 @@ export function CategoryClient({
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024); // lg breakpoint
     };
-    
+
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
@@ -54,7 +54,10 @@ export function CategoryClient({
 
   // Hide content type filter for specific category pages on desktop only
   // On mobile, always show the filter so users can switch between Movies/Series
-  const showTypeFilter = isMobile || !categoryId || !categoriesWithoutTypeFilter.includes(categoryId);
+  const showTypeFilter =
+    isMobile ||
+    !categoryId ||
+    !categoriesWithoutTypeFilter.includes(categoryId);
 
   const { data: genres = [] } = useGenres();
 
@@ -89,11 +92,11 @@ export function CategoryClient({
       } else if (selectedType === "Series") {
         // Series includes both "series" and "anime"
         filtered = filtered.filter(
-          (video) => video.type === "series" || video.type === "anime"
+          (video) => video.type === "series" || video.type === "anime",
         );
       }
       // "All" shows everything, no filtering needed
-      
+
       // Still apply category-specific filters (like trending)
       if (categoryId === "trending") {
         filtered = filtered.filter((video) => video.is_trending);
@@ -130,7 +133,7 @@ export function CategoryClient({
         } else if (selectedType === "Series") {
           // Series includes both "series" and "anime"
           filtered = filtered.filter(
-            (video) => video.type === "series" || video.type === "anime"
+            (video) => video.type === "series" || video.type === "anime",
           );
         }
         // "All" shows everything (from the category), no additional filtering needed
@@ -143,13 +146,18 @@ export function CategoryClient({
         // Check if the video has genres array
         if (video.genres && video.genres.length > 0) {
           return video.genres.some(
-            (genre) => genre.slug === selectedGenre || genre.name === selectedGenre
+            (genre) =>
+              genre.slug === selectedGenre || genre.name === selectedGenre,
           );
         }
         // Fallback to genre_ids if genres array is not populated
-        if (video.genre_ids && video.genre_ids.length > 0 && genres.length > 0) {
+        if (
+          video.genre_ids &&
+          video.genre_ids.length > 0 &&
+          genres.length > 0
+        ) {
           const selectedGenreObj = genres.find(
-            (g) => g.slug === selectedGenre || g.name === selectedGenre
+            (g) => g.slug === selectedGenre || g.name === selectedGenre,
           );
           if (selectedGenreObj) {
             return video.genre_ids.includes(Number(selectedGenreObj.id));
@@ -160,7 +168,15 @@ export function CategoryClient({
     }
 
     return filtered;
-  }, [videos, categoryId, selectedType, selectedGenre, genres, showTypeFilter, isMobile]);
+  }, [
+    videos,
+    categoryId,
+    selectedType,
+    selectedGenre,
+    genres,
+    showTypeFilter,
+    isMobile,
+  ]);
 
   const handleReset = () => {
     setSelectedGenre(undefined);
@@ -169,7 +185,8 @@ export function CategoryClient({
     }
   };
 
-  const hasFilters = Boolean(selectedGenre) || (showTypeFilter && selectedType !== "All");
+  const hasFilters =
+    Boolean(selectedGenre) || (showTypeFilter && selectedType !== "All");
 
   return (
     <div className="min-h-screen">
@@ -250,7 +267,7 @@ export function CategoryClient({
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 lg:gap-4">
             {Array.from({ length: 21 }).map((_, i) => (
               <div key={i} className="space-y-2">
-                <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                <Skeleton className="aspect-2/3 w-full rounded-lg" />
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
               </div>
@@ -273,7 +290,12 @@ export function CategoryClient({
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 lg:gap-4">
             {filteredVideos.map((video) => (
-              <ShowCard key={video.id} show={video} variant="compact" showType />
+              <ShowCard
+                key={video.id}
+                show={video}
+                variant="compact"
+                showType
+              />
             ))}
           </div>
         )}

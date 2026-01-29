@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { categories } from "@/lib/data";
 import {
   generatePageMetadata,
@@ -75,7 +76,9 @@ export default async function CategoryPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <CategoryClient categoryName={categoryInfo.name} categoryId={category} />
+      <Suspense fallback={<div className="min-h-screen" />}>
+        <CategoryClient categoryName={categoryInfo.name} categoryId={category} />
+      </Suspense>
     </>
   );
 }
